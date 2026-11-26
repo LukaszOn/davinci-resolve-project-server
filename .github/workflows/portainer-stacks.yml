@@ -16,12 +16,15 @@ jobs:
           - file: compose.portainer.yml
             postgres: 18
             panel: false
+            portainer: true
           - file: compose.portainer-panel.yml
             postgres: 18
             panel: true
+            portainer: true
           - file: compose.portainer-panel.yml
             postgres: 16
             panel: true
+            portainer: false
     env:
       POSTGRES_VERSION: ${{ matrix.postgres }}
       POSTGRES_PASSWORD: ci-only-project-server
@@ -33,19 +36,48 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Deploy from a single file
+      - name: Prepare a single Compose file
         run: |
           mkdir "$RUNNER_TEMP/portainer-test"
           cp "${{ matrix.file }}" "$RUNNER_TEMP/portainer-test/compose.yml"
           cd "$RUNNER_TEMP/portainer-test"
           docker compose config --quiet
+      - name: Deploy from Portainer's Web editor endpoint
+        if: matrix.portainer
+        working-directory: ${{ runner.temp }}/portainer-test
+        run: |
+          (umask 077; openssl rand -hex 24 > "$RUNNER_TEMP/portainer-admin")
+          docker run -d --name portainer-ci -p 127.0.0.1:19443:9443 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/portainer-admin:/run/admin-password:ro" \
+            portainer/portainer-ce:lts --admin-password-file /run/admin-password
+          api=https://127.0.0.1:19443/api
+          curl -kfsS --retry 20 --retry-delay 2 --retry-connrefused https://127.0.0.1:19443/ >/dev/null
+          token=$(jq -n --rawfile password "$RUNNER_TEMP/portainer-admin" '{Username:"admin",Password:($password|rtrimstr("\n"))}' |
+            curl -kfsS -H 'Content-Type: application/json' --data-binary @- "$api/auth" |
+            jq -er .jwt)
+          endpoint=$(curl -kfsS -H "Authorization: Bearer $token" "$api/endpoints" | jq -r '.[0].Id // empty')
+          if [ -z "$endpoint" ]; then
+            endpoint=$(curl -kfsS -H "Authorization: Bearer $token" -F 'Name=local-ci' -F 'EndpointCreationType=1' "$api/endpoints" | jq -er .Id)
+          fi
+          jq -n --rawfile compose compose.yml '{
+            Name: "portainer-test",
+            StackFileContent: $compose,
+            Env: (["POSTGRES_VERSION","POSTGRES_PASSWORD","PGADMIN_DEFAULT_EMAIL","PGADMIN_DEFAULT_PASSWORD","PANEL_ADMIN_PASSWORD","RESOLVE_LIBRARY"]
+                | map({name:.,value:env[.]}))
+          }' | curl -kfsS --max-time 300 -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            --data-binary @- "$api/stacks/create/standalone/string?endpointId=$endpoint" | jq -e '.Id > 0'
+      - name: Deploy with Docker Compose
+        if: ${{ !matrix.portainer }}
+        working-directory: ${{ runner.temp }}/portainer-test
+        run: |
           docker compose up -d --wait --wait-timeout 240
       - name: Verify first library and its backup
         working-directory: ${{ runner.temp }}/portainer-test
         run: |
-          curl --fail --silent --show-error http://127.0.0.1:3001/misc/ping
+          curl --retry 45 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3001/misc/ping
           if [ "${{ matrix.panel }}" = true ]; then
-            curl --fail --silent --show-error http://127.0.0.1:3012/login >/dev/null
+            curl --retry 30 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3012/login >/dev/null
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3012/healthz)" = 503
           fi
           docker compose exec -T postgres createdb -U postgres "$RESOLVE_LIBRARY"
@@ -70,3 +102,4 @@ jobs:
           cd "$RUNNER_TEMP/portainer-test"
           docker compose ps -a
           docker compose logs --tail 80
+          docker logs --tail 40 portainer-ci 2>/dev/null || true
