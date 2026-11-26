@@ -9,14 +9,14 @@ import secrets
 
 def database(value):
     if not re.fullmatch(r'[a-zA-Z0-9_]{1,63}', value) or value in {'template0', 'template1'}:
-        raise argparse.ArgumentTypeError('Użyj od 1 do 63 liter ASCII, cyfr lub podkreśleń.')
+        raise argparse.ArgumentTypeError('Use 1–63 ASCII letters, digits, or underscores.')
     return value
 
 
 def port(value):
     number = int(value)
     if not 1 <= number <= 65535:
-        raise argparse.ArgumentTypeError('Port musi mieścić się w zakresie 1–65535.')
+        raise argparse.ArgumentTypeError('Use a port in the range 1–65535.')
     return number
 
 
@@ -26,22 +26,22 @@ def address(value):
     try:
         return str(ip_network(value, strict=False))
     except ValueError as error:
-        raise argparse.ArgumentTypeError('Podaj adres IP, podsieć CIDR albo all.') from error
+        raise argparse.ArgumentTypeError('Enter an IP address, CIDR subnet, or all.') from error
 
 
 def compose_literal(value):
     if any(ord(character) < 32 for character in value):
-        raise ValueError('Konfiguracja nie może zawierać znaków sterujących.')
+        raise ValueError('Configuration values cannot contain control characters.')
     return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 
 def initialize(args):
     if not re.fullmatch(r'[a-zA-Z0-9_.:-]+', args.db_host):
-        raise ValueError('Podaj nazwę hosta albo pojedynczy adres IP PostgreSQL.')
+        raise ValueError('Enter a PostgreSQL hostname or single IP address.')
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', args.project):
-        raise ValueError('Nazwa projektu Compose może składać się z małych liter, cyfr, myślników i podkreśleń.')
+        raise ValueError('Use lowercase letters, digits, hyphens, and underscores in the Compose project name.')
     if not 1 <= len(args.title.strip()) <= 80:
-        raise ValueError('Nazwa panelu musi mieć od 1 do 80 znaków.')
+        raise ValueError('Use 1–80 characters for the panel name.')
 
     binding = ip_address(args.bind)
     path = args.output
@@ -59,14 +59,14 @@ def initialize(args):
     with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as config:
         for name, value in settings.items():
             config.write(f'{name}={value}\n')
-    print(f'Zapisano {path}. Hasło do panelu znajduje się w PANEL_ADMIN_PASSWORD.')
+    print(f'Saved {path}. The panel password is in PANEL_ADMIN_PASSWORD.')
 
 
 def hba(args):
     if args.control_db in args.libraries:
-        raise ValueError('Baza rejestru kont musi być osobna od bibliotek.')
+        raise ValueError('Use a separate database for the account registry.')
     remote = 'hostssl' if args.ssl else 'host'
-    print('# Wstaw reguły przed ogólnymi regułami logowania PostgreSQL.')
+    print('# Insert the rules above the general PostgreSQL login rules.')
     print(f'local "{args.control_db}" resolve_panel_agent scram-sha-256')
     print(f'{remote} "{args.control_db}" resolve_panel_agent {args.panel_from} scram-sha-256')
     for library in dict.fromkeys(args.libraries):
@@ -80,20 +80,20 @@ def hba(args):
 def main():
     parser = argparse.ArgumentParser(description='Konfiguracja Project Library Desk dla Docker Compose.')
     actions = parser.add_subparsers(required=True)
-    init = actions.add_parser('init', help='Utwórz nowy plik .env z losowymi hasłami.')
+    init = actions.add_parser('init', help='Create a new .env file with generated passwords.')
     init.add_argument('--db-host', required=True)
     init.add_argument('--db-port', type=port, default=5432)
     init.add_argument('--control-db', type=database, default='postgres')
     init.add_argument('--sslmode', choices=('disable', 'prefer', 'require', 'verify-ca', 'verify-full'), default='prefer')
     init.add_argument('--bind', default='127.0.0.1')
     init.add_argument('--port', type=port, default=3012)
-    init.add_argument('--https', action='store_true', help='Przeglądarka będzie łączyć się przez HTTPS.')
+    init.add_argument('--https', action='store_true', help='Connect to the panel over HTTPS.')
     init.add_argument('--title', default='Project Library Desk')
     init.add_argument('--project', default='project-library-desk')
     init.add_argument('--output', type=Path, default=Path('.env'))
     init.set_defaults(run=initialize)
 
-    rules = actions.add_parser('hba', help='Wypisz reguły pg_hba.conf dla wybranych bibliotek.')
+    rules = actions.add_parser('hba', help='Print pg_hba.conf rules for the selected libraries.')
     rules.add_argument('libraries', nargs='+', type=database)
     rules.add_argument('--control-db', type=database, default='postgres')
     rules.add_argument('--panel-from', type=address, default='all')
@@ -105,7 +105,7 @@ def main():
     try:
         args.run(args)
     except FileExistsError as error:
-        parser.exit(2, f'Plik już istnieje. Zachowaj jego ustawienia lub użyj innej ścieżki: {error.filename}\n')
+        parser.exit(2, f'The file already exists. Keep it or choose a different path: {error.filename}\n')
     except (ValueError, OSError) as error:
         parser.exit(2, f'{error}\n')
 

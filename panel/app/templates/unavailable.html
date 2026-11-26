@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}Panel dostępu{% endblock %}
+{% block title %}{{ tr('Access panel') }}{% endblock %}
 {% block body %}
 <main class="single">
   <div class="single-card">
-    <h1>{{ 'Sesja lub formularz wygasł' if invalid else 'Panel chwilowo niedostępny' }}</h1>
+    <h1>{{ tr('The session or form has expired') if invalid else tr('Panel temporarily unavailable') }}</h1>
     {% if not invalid and panel_managed_library %}
-      <p>Panel potrzebuje biblioteki <strong>{{ panel_managed_library }}</strong>. Utwórz ją w DaVinci Resolve albo odtwórz z kopii, odczekaj chwilę i odśwież stronę.</p>
-      <p>Jeśli biblioteka już istnieje, sprawdź logi usługi <code>panel-setup</code>.</p>
+      <p>{{ tr('The panel needs the {library} library. Create it in DaVinci Resolve or restore it from a backup, wait a moment, and refresh the page.', library=panel_managed_library) }}</p>
+      <p>{{ tr('If the library already exists, check the logs for the panel-setup service.') }}</p>
     {% else %}
-      <p>{{ 'Wróć do panelu i spróbuj ponownie.' if invalid else 'Sprawdź połączenie z PostgreSQL i konfigurację panelu.' }}</p>
+      <p>{{ tr('Return to the panel and try again.') if invalid else tr('Check the PostgreSQL connection and the panel configuration.') }}</p>
     {% endif %}
-    <a class="button primary" href="{{ url_for('index') }}">Wróć do panelu</a>
+    <a class="button primary" href="{{ url_for('index') }}">{{ tr('Back to the panel') }}</a>
+    {% include 'language.html' %}
   </div>
 </main>
 {% endblock %}

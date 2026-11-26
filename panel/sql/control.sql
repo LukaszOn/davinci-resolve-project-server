@@ -61,26 +61,26 @@ DECLARE
     library_role name;
 BEGIN
     IF action NOT IN ('create', 'grant', 'revoke', 'enable', 'disable', 'password') OR action IS NULL THEN
-        RAISE EXCEPTION 'Nieznana operacja.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Unknown operation.' USING ERRCODE = 'P0001';
     END IF;
     IF login_name IS NULL OR login_name !~ '^[a-z][a-z0-9_]{1,30}$'
         OR login_name ~ '^(pg_|resolve_panel_|resolve_lib_)' OR login_name = 'postgres' THEN
-        RAISE EXCEPTION 'Wybierz inny login.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Choose a different username.' USING ERRCODE = 'P0001';
     END IF;
 
     IF action IN ('create', 'password') AND (
         password_verifier IS NULL OR length(password_verifier) > 250 OR
         password_verifier !~ '^SCRAM-SHA-256\$[0-9]+:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$'
     ) THEN
-        RAISE EXCEPTION 'Nie udało się przygotować hasła.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Could not prepare the password.' USING ERRCODE = 'P0001';
     END IF;
 
     IF action = 'create' THEN
         IF display_name IS NULL OR length(btrim(display_name)) NOT BETWEEN 1 AND 80 THEN
-            RAISE EXCEPTION 'Podaj nazwę osoby.' USING ERRCODE = 'P0001';
+            RAISE EXCEPTION 'Enter a display name.' USING ERRCODE = 'P0001';
         END IF;
         IF EXISTS (SELECT FROM pg_roles WHERE rolname = login_name) THEN
-            RAISE EXCEPTION 'Ten login jest już zajęty.' USING ERRCODE = 'P0001';
+            RAISE EXCEPTION 'This username is already taken.' USING ERRCODE = 'P0001';
         END IF;
         EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L IN ROLE resolve_panel_members', login_name, password_verifier);
         SELECT oid INTO STRICT login_id FROM pg_roles WHERE rolname = login_name;
@@ -95,13 +95,13 @@ BEGIN
         AND NOT r.rolsuper AND NOT r.rolcreaterole AND pg_has_role(r.oid, 'resolve_panel_members', 'MEMBER')
     FOR UPDATE OF p;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Nie znaleziono tego konta w panelu.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'This account was not found in the panel.' USING ERRCODE = 'P0001';
     END IF;
 
     IF action IN ('grant', 'revoke') THEN
         SELECT l.access_role INTO library_role FROM resolve_access.available_libraries l WHERE l.name = library_name;
         IF NOT FOUND THEN
-            RAISE EXCEPTION 'Ta biblioteka jest obecnie niedostępna.' USING ERRCODE = 'P0001';
+            RAISE EXCEPTION 'This library is currently unavailable.' USING ERRCODE = 'P0001';
         END IF;
         IF action = 'grant' THEN
             EXECUTE format('GRANT %I TO %I', library_role, login_name);
@@ -149,7 +149,7 @@ DECLARE
     library_role name;
 BEGIN
     IF action IS NULL OR action NOT IN ('create', 'edit', 'password', 'delete') THEN
-        RAISE EXCEPTION 'Nieznana operacja.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Unknown operation.' USING ERRCODE = 'P0001';
     END IF;
     IF action IN ('create', 'edit') AND (
         member_role IS NULL OR member_role NOT IN ('administrator', 'collaborator')
@@ -157,14 +157,14 @@ BEGIN
         OR new_login IS NULL OR new_login !~ '^[a-z][a-z0-9_]{1,30}$'
         OR new_login ~ '^(pg_|resolve_panel_|resolve_lib_)' OR new_login = 'postgres'
     ) THEN
-        RAISE EXCEPTION 'Sprawdź nazwę, login i rolę użytkownika.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Check the display name, username, and account role.' USING ERRCODE = 'P0001';
     END IF;
     IF action IN ('create', 'password') AND (web_hash IS NULL OR octet_length(web_hash) > 250
         OR web_hash NOT LIKE 'scrypt:%') THEN
-        RAISE EXCEPTION 'Nie udało się przygotować hasła.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Could not prepare the password.' USING ERRCODE = 'P0001';
     END IF;
     IF octet_length(photo) > 131072 THEN
-        RAISE EXCEPTION 'Zdjęcie może mieć do 128 KB.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'The photo can be up to 128 KB.' USING ERRCODE = 'P0001';
     END IF;
 
     IF action = 'create' THEN
@@ -180,7 +180,7 @@ BEGIN
         AND pg_has_role(r.oid, 'resolve_panel_members', 'MEMBER')
     FOR UPDATE OF p;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Nie znaleziono tego konta w panelu.' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'This account was not found in the panel.' USING ERRCODE = 'P0001';
     END IF;
 
     IF action = 'password' THEN
@@ -188,11 +188,11 @@ BEGIN
         UPDATE resolve_access.people SET panel_hash = web_hash WHERE login_oid = person.login_oid;
     ELSIF action = 'edit' THEN
         IF member_role = 'administrator' AND person.panel_hash IS NULL THEN
-            RAISE EXCEPTION 'Przed nadaniem roli administratora ustaw hasło tego konta w panelu.' USING ERRCODE = 'P0001';
+            RAISE EXCEPTION 'Set this account’s password in the panel before assigning the administrator role.' USING ERRCODE = 'P0001';
         END IF;
         IF new_login <> login_name THEN
             IF EXISTS (SELECT FROM pg_roles WHERE rolname = new_login) THEN
-                RAISE EXCEPTION 'Ten login jest już zajęty.' USING ERRCODE = 'P0001';
+                RAISE EXCEPTION 'This username is already taken.' USING ERRCODE = 'P0001';
             END IF;
             EXECUTE format('ALTER ROLE %I RENAME TO %I', login_name, new_login);
         END IF;

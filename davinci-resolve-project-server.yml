@@ -1,7 +1,7 @@
-# Wklej ten plik w edytorze stacków lub zapisz jako compose.yml.
+# Paste this file into your stack editor or save it as compose.yml.
 # Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
-# RESOLVE_LIBRARY to nazwa biblioteki, którą utworzysz w Resolve (domyślnie studio).
-# Dla dostępu z innego komputera podaj POSTGRES_BIND_IP (adres hosta Docker).
+# RESOLVE_LIBRARY is the library name you will create in Resolve (default: studio).
+# For access from another computer, set POSTGRES_BIND_IP to the Docker host address.
 x-postgres: &postgres-environment
   POSTGRES_USER: ${POSTGRES_USER:-postgres}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}

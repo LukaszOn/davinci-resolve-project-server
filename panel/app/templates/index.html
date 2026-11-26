@@ -7,75 +7,78 @@
   {% endif %}
 {%- endmacro %}
 {% macro password_fields(prefix) -%}
-  <label>Własne hasło<input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="{{ prefix }}-hint"></label>
-  <label>Powtórz hasło<input type="password" name="password_confirmation" minlength="8" maxlength="128" autocomplete="new-password"></label>
-  <small id="{{ prefix }}-hint">Od 8 do 128 znaków. Zostaw oba pola puste, aby wygenerować hasło.</small>
+  <label>{{ tr('Custom password') }}<input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="{{ prefix }}-hint"></label>
+  <label>{{ tr('Repeat password') }}<input type="password" name="password_confirmation" minlength="8" maxlength="128" autocomplete="new-password"></label>
+  <small id="{{ prefix }}-hint">{{ tr('Use 8–128 characters. Leave both fields blank to generate a password.') }}</small>
 {%- endmacro %}
 {% macro role_field(current='collaborator') -%}
-  <label>Rola<select name="account_role" required>
+  <label>{{ tr('Role') }}<select name="account_role" required>
     {% for value, label in roles.items() %}<option value="{{ value }}" {% if value == current %}selected{% endif %}>{{ label }}</option>{% endfor %}
   </select></label>
-  <small>Administrator może zarządzać kontami w panelu. Dostęp do bibliotek nadajesz osobno.</small>
+  <small>{{ tr('Administrators can manage accounts in the panel. Assign library access separately.') }}</small>
 {%- endmacro %}
 {% block body %}
-<a class="skip" href="#main">Przejdź do użytkowników</a>
+<a class="skip" href="#main">{{ tr('Skip to users') }}</a>
 <div class="workspace">
   <aside class="rail">
     <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark" aria-hidden="true"></span>
-      <span><strong>{{ panel_display_name }}</strong><small>Biblioteki DaVinci Resolve</small></span>
+      <span><strong>{{ panel_display_name }}</strong><small>{{ tr('DaVinci Resolve libraries') }}</small></span>
     </a>
-    <nav aria-label="Filtrowanie użytkowników">
+    <nav aria-label="{{ tr('Filter users') }}">
       <a class="rail-link{% if not library_filter %} current{% endif %}" href="{{ url_for('index') }}" {% if not library_filter %}aria-current="page"{% endif %}>
-        <span class="people-icon" aria-hidden="true"></span> Użytkownicy <span class="rail-count">{{ total }}</span>
+        <span class="people-icon" aria-hidden="true"></span> {{ tr('Users') }} <span class="rail-count">{{ total }}</span>
       </a>
-      <h2>Biblioteki</h2>
+      <h2>{{ tr('Libraries') }}</h2>
       {% for library in libraries %}
         <a class="rail-link{% if library_filter == library %} current{% endif %}" href="{{ url_for('index', biblioteka=library) }}" {% if library_filter == library %}aria-current="page"{% endif %}>
           <span class="library-icon" aria-hidden="true"></span><span class="rail-library">{{ library }}</span><span class="rail-count">{{ counts[library] }}</span>
         </a>
       {% else %}
-        <p class="rail-empty">Brak podłączonych bibliotek</p>
+        <p class="rail-empty">{{ tr('No connected libraries') }}</p>
       {% endfor %}
     </nav>
+    <div class="rail-preferences">
+      {% include 'language.html' %}
+    </div>
     <form action="{{ url_for('logout') }}" method="post" class="rail-foot">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit"><span aria-hidden="true">↗</span> Wyloguj się</button>
+      <button type="submit"><span aria-hidden="true">↗</span> {{ tr('Sign out') }}</button>
     </form>
   </aside>
 
   <main id="main" class="main">
     <header class="masthead">
       <div>
-        <p class="connection"><span></span> Połączono z PostgreSQL</p>
-        <h1>Dostęp do projektów</h1>
-        <p>Dodawaj osoby i wybieraj biblioteki, z którymi mogą pracować w Resolve.</p>
+        <p class="connection"><span></span> {{ tr('Connected to PostgreSQL') }}</p>
+        <h1>{{ tr('Project access') }}</h1>
+        <p>{{ tr('Add people and choose which libraries they can use in Resolve.') }}</p>
       </div>
-      <button type="button" class="button primary" data-open-dialog="add-person"><span aria-hidden="true">+</span> Dodaj osobę</button>
+      <button type="button" class="button primary" data-open-dialog="add-person"><span aria-hidden="true">+</span> {{ tr('Add person') }}</button>
     </header>
 
     {% for category, message in get_flashed_messages(with_categories=true) %}
-      <div role="status" class="notice {{ category }}">{{ message }}</div>
+      <div role="status" class="notice {{ category }}">{{ tr(message) }}</div>
     {% endfor %}
 
     <div class="layout">
       <section class="card directory" aria-labelledby="directory-title">
         <header class="directory-head">
           <div>
-            <h2 id="directory-title">{{ library_filter or 'Użytkownicy' }}</h2>
-            <p>{% if library_filter or query %}Osoby na liście: {{ people|length }}{% else %}Aktywne konta: {{ active }} z {{ total }}{% endif %}</p>
+            <h2 id="directory-title">{{ library_filter or tr('Users') }}</h2>
+            <p>{% if library_filter or query %}{{ tr('People listed: {count}', count=people|length) }}{% else %}{{ tr('Active accounts: {active} of {total}', active=active, total=total) }}{% endif %}</p>
           </div>
           <form class="search" method="get" action="{{ url_for('index') }}">
             {% if library_filter %}<input type="hidden" name="biblioteka" value="{{ library_filter }}">{% endif %}
-            <label class="sr-only" for="search">Szukaj osoby</label>
-            <input id="search" type="search" name="q" maxlength="80" value="{{ query }}" placeholder="Szukaj osoby">
-            <button type="submit" aria-label="Szukaj"><span class="search-icon" aria-hidden="true"></span></button>
+            <label class="sr-only" for="search">{{ tr('Search for a person') }}</label>
+            <input id="search" type="search" name="q" maxlength="80" value="{{ query }}" placeholder="{{ tr('Search for a person') }}">
+            <button type="submit" aria-label="{{ tr('Search') }}"><span class="search-icon" aria-hidden="true"></span></button>
           </form>
         </header>
         {% if people %}
           <div class="table-wrap">
             <table>
-              <thead><tr><th scope="col">Osoba</th><th scope="col">Rola</th><th scope="col">Biblioteki</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Szczegóły</span></th></tr></thead>
+              <thead><tr><th scope="col">{{ tr('Person') }}</th><th scope="col">{{ tr('Role') }}</th><th scope="col">{{ tr('Libraries') }}</th><th scope="col">Status</th><th scope="col"><span class="sr-only">{{ tr('Details') }}</span></th></tr></thead>
               <tbody>
                 {% for person in people %}
                   <tr class="{% if selected and selected.username == person.username %}selected{% endif %}">
@@ -87,8 +90,8 @@
                     </th>
                     <td><span class="member-role{% if person.account_role == 'administrator' %} is-admin{% endif %}">{{ roles[person.account_role] }}</span></td>
                     <td><span class="library-count">{{ person.libraries|length }}</span></td>
-                    <td>{% if person.enabled %}<span class="state active">Aktywne</span>{% else %}<span class="state muted">Zablokowane</span>{% endif %}</td>
-                    <td><a class="arrow" href="{{ url_for('index', osoba=person.username, biblioteka=library_filter or None, q=query or None) }}#details" aria-label="Dostęp dla {{ person.label }}">→</a></td>
+                    <td>{% if person.enabled %}<span class="state active">{{ tr('Active') }}</span>{% else %}<span class="state muted">{{ tr('Locked') }}</span>{% endif %}</td>
+                    <td><a class="arrow" href="{{ url_for('index', osoba=person.username, biblioteka=library_filter or None, q=query or None) }}#details" aria-label="{{ tr('Access for {name}', name=person.label) }}">→</a></td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -96,53 +99,53 @@
           </div>
         {% else %}
           <div class="empty">
-            <h3>{% if query %}Brak wyników{% elif library_filter %}Brak przypisanych osób{% else %}Dodaj pierwszą osobę{% endif %}</h3>
-            <p>{% if query %}Wyszukaj po nazwie osoby lub loginie.{% elif library_filter %}Wybierz osobę z listy użytkowników i nadaj jej dostęp do tej biblioteki.{% else %}Każda osoba otrzyma własny login do DaVinci Resolve.{% endif %}</p>
-            {% if query or library_filter %}<a class="button secondary" href="{{ url_for('index') }}">Pokaż wszystkich</a>{% endif %}
+            <h3>{% if query %}{{ tr('No results') }}{% elif library_filter %}{{ tr('No people assigned') }}{% else %}{{ tr('Add your first person') }}{% endif %}</h3>
+            <p>{% if query %}{{ tr('Search by display name or username.') }}{% elif library_filter %}{{ tr('Select a person from the user list and grant access to this library.') }}{% else %}{{ tr('Each person gets a separate DaVinci Resolve login.') }}{% endif %}</p>
+            {% if query or library_filter %}<a class="button secondary" href="{{ url_for('index') }}">{{ tr('Show everyone') }}</a>{% endif %}
           </div>
         {% endif %}
       </section>
 
       <section class="card details" id="details" tabindex="-1" aria-labelledby="details-title">
-        <h2 id="details-title">Szczegóły dostępu</h2>
+        <h2 id="details-title">{{ tr('Access details') }}</h2>
         {% if selected %}
           <div class="profile">
             {{ person_avatar(selected, 'big') }}
             <div><h3>{{ selected.label }}</h3><p>{{ selected.username }} · {{ roles[selected.account_role] }}</p></div>
           </div>
-          <h3 class="section-label">Biblioteki tej osoby</h3>
+          <h3 class="section-label">{{ tr('This person’s libraries') }}</h3>
           <ul class="assignments">
             {% for library in libraries %}
               {% set has_access = library in selected.libraries %}
               <li>
-                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ 'Przypisano' if has_access else 'Bez dostępu' }}</small></div>
-                <form method="post" action="{{ url_for('change_person') }}" {% if has_access %}data-confirm="Odebrać dostęp do tej biblioteki? Otwarte połączenia zostaną zamknięte."{% endif %}>
+                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ tr('Assigned') if has_access else tr('No access') }}</small></div>
+                <form method="post" action="{{ url_for('change_person') }}" {% if has_access %}data-confirm="{{ tr('Revoke access to this library? Open connections will be closed.') }}"{% endif %}>
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="username" value="{{ selected.username }}">
                   <input type="hidden" name="library" value="{{ library }}">
-                  <button type="submit" class="button small {% if has_access %}secondary{% else %}tinted{% endif %}" name="action" value="{{ 'revoke' if has_access else 'grant' }}" aria-label="{{ 'Odbierz' if has_access else 'Nadaj' }} dostęp do {{ library }}">{{ 'Odbierz' if has_access else 'Nadaj' }}</button>
+                  <button type="submit" class="button small {% if has_access %}secondary{% else %}tinted{% endif %}" name="action" value="{{ 'revoke' if has_access else 'grant' }}" aria-label="{{ tr('Revoke access to {library}' if has_access else 'Grant access to {library}', library=library) }}">{{ tr('Revoke') if has_access else tr('Grant') }}</button>
                 </form>
               </li>
             {% else %}
-              <li class="empty-detail">Podłącz bibliotekę, aby nadawać dostęp.</li>
+              <li class="empty-detail">{{ tr('Connect a library to grant access.') }}</li>
             {% endfor %}
           </ul>
           <div class="account-actions">
-            <button type="button" class="button secondary small" data-open-dialog="edit-person">Edytuj konto</button>
-            <button type="button" class="button secondary small" data-open-dialog="password-person">Zmień hasło</button>
+            <button type="button" class="button secondary small" data-open-dialog="edit-person">{{ tr('Edit account') }}</button>
+            <button type="button" class="button secondary small" data-open-dialog="password-person">{{ tr('Change password') }}</button>
             {% if selected.username != session.get('principal') %}
-            <form method="post" action="{{ url_for('change_person') }}" {% if selected.enabled %}data-confirm="Zablokować to konto i zakończyć jego otwarte połączenia?"{% endif %}>
+            <form method="post" action="{{ url_for('change_person') }}" {% if selected.enabled %}data-confirm="{{ tr('Lock this account and close its open connections?') }}"{% endif %}>
               <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
-              <button class="button {% if selected.enabled %}danger{% else %}tinted{% endif %} small" type="submit" name="action" value="{{ 'disable' if selected.enabled else 'enable' }}">{{ 'Zablokuj konto' if selected.enabled else 'Odblokuj konto' }}</button>
+              <button class="button {% if selected.enabled %}danger{% else %}tinted{% endif %} small" type="submit" name="action" value="{{ 'disable' if selected.enabled else 'enable' }}">{{ tr('Lock account') if selected.enabled else tr('Unlock account') }}</button>
             </form>
-            <form method="post" action="{{ url_for('change_person') }}" data-confirm="Usunąć konto {{ selected.label }}? Użytkownik utraci dostęp do wszystkich bibliotek. Projekty zostaną zachowane.">
+            <form method="post" action="{{ url_for('change_person') }}" data-confirm="{{ tr('Delete account {name}? The user will lose access to all libraries. Projects will be kept.', name=selected.label) }}">
               <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
-              <button class="button danger small" type="submit" name="action" value="delete">Usuń konto</button>
+              <button class="button danger small" type="submit" name="action" value="delete">{{ tr('Delete account') }}</button>
             </form>
             {% endif %}
           </div>
         {% else %}
-          <p class="empty-detail">Wybierz osobę, aby sprawdzić jej biblioteki i zmienić dostęp.</p>
+          <p class="empty-detail">{{ tr('Select a person to view their libraries and change access.') }}</p>
         {% endif %}
       </section>
     </div>
@@ -151,49 +154,49 @@
 
 <dialog id="add-person" aria-labelledby="add-title">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
-    <header><h2 id="add-title">Dodaj osobę</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <header><h2 id="add-title">{{ tr('Add person') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Nazwa osoby<input name="label" maxlength="80" required placeholder="np. Anna Kowalska" autofocus></label>
-    <label>Login w Resolve<input name="username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" aria-describedby="login-hint" required placeholder="np. anna"></label>
-    <small id="login-hint">Zacznij małą literą. Możesz dodać cyfry i podkreślenia.</small>
+    <label>{{ tr('Display name') }}<input name="label" maxlength="80" required placeholder="{{ tr('e.g. Alex Smith') }}" autofocus></label>
+    <label>{{ tr('Resolve username') }}<input name="username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" aria-describedby="login-hint" required placeholder="{{ tr('e.g. alex') }}"></label>
+    <small id="login-hint">{{ tr('Start with a lowercase letter. You can add digits and underscores.') }}</small>
     {{ role_field() }}
     {{ password_fields('create-password') }}
-    <label>Zdjęcie w panelu (opcjonalne)<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
-    <small>PNG lub JPEG do 128 KB.</small>
+    <label>{{ tr('Profile photo (optional)') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+    <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
     {% if libraries %}
-      <fieldset><legend>Dostęp do bibliotek</legend>
+      <fieldset><legend>{{ tr('Library access') }}</legend>
         {% for library in libraries %}
           <label class="checkbox"><input type="checkbox" name="libraries" value="{{ library }}" {% if library_filter == library %}checked{% endif %}> {{ library }}</label>
         {% endfor %}
       </fieldset>
     {% endif %}
-    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="create" type="submit">Utwórz konto</button></footer>
+    <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="create" type="submit">{{ tr('Create account') }}</button></footer>
   </form>
 </dialog>
 {% if selected %}
 <dialog id="edit-person" aria-labelledby="edit-title">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
-    <header><h2 id="edit-title">Edytuj konto</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <header><h2 id="edit-title">{{ tr('Edit account') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
-    <label>Nazwa osoby<input name="label" maxlength="80" value="{{ selected.label }}" required autofocus></label>
-    <label>Login w Resolve<input name="new_username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" value="{{ selected.username }}" required></label>
+    <label>{{ tr('Display name') }}<input name="label" maxlength="80" value="{{ selected.label }}" required autofocus></label>
+    <label>{{ tr('Resolve username') }}<input name="new_username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" value="{{ selected.username }}" required></label>
     {% if selected.username == session.get('principal') %}
       <input type="hidden" name="account_role" value="administrator">
     {% else %}
       {{ role_field(selected.account_role) }}
     {% endif %}
-    <label>Zdjęcie w panelu<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
-    <small>PNG lub JPEG do 128 KB.</small>
-    {% if selected.has_avatar %}<label class="checkbox"><input type="checkbox" name="clear_photo" value="1"> Usuń zdjęcie</label>{% endif %}
-    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="edit" type="submit">Zapisz zmiany</button></footer>
+    <label>{{ tr('Profile photo') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+    <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
+    {% if selected.has_avatar %}<label class="checkbox"><input type="checkbox" name="clear_photo" value="1"> {{ tr('Remove photo') }}</label>{% endif %}
+    <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="edit" type="submit">{{ tr('Save changes') }}</button></footer>
   </form>
 </dialog>
 <dialog id="password-person" aria-labelledby="password-title">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form">
-    <header><h2 id="password-title">Zmień hasło</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <header><h2 id="password-title">{{ tr('Change password') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
     {{ password_fields('update-password') }}
-    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="password" type="submit">Zapisz hasło</button></footer>
+    <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="password" type="submit">{{ tr('Save password') }}</button></footer>
   </form>
 </dialog>
 {% endif %}

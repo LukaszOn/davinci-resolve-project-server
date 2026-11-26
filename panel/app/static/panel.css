@@ -183,3 +183,18 @@ dialog::backdrop { background: #131b2b88; }
   thead th:first-child, tbody th:first-child { padding-left: 11px; }
   .table-wrap .avatar { display: none; }
 }
+
+.rail-preferences { margin-top: auto; padding: 14px 0 3px; }
+.rail-preferences + .rail-foot { margin-top: 0; }
+.language-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; font-size: .8rem; }
+.single-card .language-picker { margin-top: 16px; }
+.language-picker label { font-weight: 400; opacity: .84; }
+.language-picker select {
+  width: auto;
+  font: inherit;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 3px 22px 3px 7px;
+}

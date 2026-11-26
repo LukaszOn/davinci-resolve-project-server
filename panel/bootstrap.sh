@@ -9,7 +9,7 @@ case "${1:-}" in
         until [ -r "$secrets_dir/agent-password" ] && [ -r "$secrets_dir/session-key" ]; do
             attempts=$((attempts + 1))
             if [ "$attempts" -ge 60 ]; then
-                printf '%s\n' 'Panel czeka na sekrety. Sprawdź logi usługi panel-setup.' >&2
+                printf '%s\n' 'Waiting for panel secrets. Check the panel-setup logs.' >&2
                 exit 1
             fi
             sleep 1
@@ -34,10 +34,10 @@ case "${1:-}" in
         exec gosu postgres sh /panel/bootstrap.sh register
         ;;
     register)
-        library=${RESOLVE_LIBRARY:?Podaj nazwę biblioteki w RESOLVE_LIBRARY}
+        library=${RESOLVE_LIBRARY:?Set the library name in RESOLVE_LIBRARY}
         case "$library" in
             *[!a-zA-Z0-9_]*|postgres|template0|template1)
-                printf '%s\n' 'RESOLVE_LIBRARY musi być nazwą biblioteki (litery ASCII, cyfry i podkreślenia).' >&2
+                printf '%s\n' 'Use ASCII letters, digits, and underscores in RESOLVE_LIBRARY.' >&2
                 exit 2
                 ;;
         esac
@@ -49,13 +49,13 @@ case "${1:-}" in
 SELECT EXISTS (SELECT FROM pg_database WHERE datname = :'library' AND datallowconn AND NOT datistemplate);
 SQL
         }
-        printf 'Czekam na bibliotekę %s. Utwórz ją w DaVinci Resolve albo odtwórz z kopii.\n' "$library"
+        printf 'Waiting for library %s. Create it in DaVinci Resolve or restore it from a backup.\n' "$library"
         while [ "$(library_exists)" != t ]; do sleep 5; done
 
         agent_exists=$(query -c "SELECT EXISTS (SELECT FROM pg_roles WHERE rolname = 'resolve_panel_agent')")
         if [ "$agent_exists" = t ]; then
             if ! PGPASSWORD="$PANEL_AGENT_PASSWORD" query -U resolve_panel_agent -c 'SELECT 1' >/dev/null 2>&1; then
-                printf '%s\n' 'Baza ma już konto techniczne panelu z innym hasłem. Użyj woluminu sekretów tej instalacji.' >&2
+                printf '%s\n' 'The existing panel service account has a different password. Use the secrets volume from that installation.' >&2
                 exit 1
             fi
         fi

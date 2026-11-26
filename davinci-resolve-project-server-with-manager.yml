@@ -1,8 +1,8 @@
-# Wklej ten plik w edytorze stacków lub zapisz jako compose.yml.
+# Paste this file into your stack editor or save it as compose.yml.
 # Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
-# Dla panelu dodaj też PANEL_ADMIN_PASSWORD (co najmniej 32 znaki).
-# RESOLVE_LIBRARY to nazwa biblioteki, którą utworzysz w Resolve (domyślnie studio).
-# Dla dostępu z innego komputera podaj POSTGRES_BIND_IP (adres hosta Docker).
+# For the web panel, also set PANEL_ADMIN_PASSWORD (at least 32 characters).
+# RESOLVE_LIBRARY is the library name you will create in Resolve (default: studio).
+# For access from another computer, set POSTGRES_BIND_IP to the Docker host address.
 x-postgres: &postgres-environment
   POSTGRES_USER: ${POSTGRES_USER:-postgres}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
@@ -144,7 +144,7 @@ services:
       PANEL_DB_HOST: postgres
       PANEL_DB_NAME: postgres
       PANEL_MANAGED_LIBRARY: ${RESOLVE_LIBRARY:-studio}
-      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Ustaw PANEL_ADMIN_PASSWORD (co najmniej 32 znaki)}
+      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Set PANEL_ADMIN_PASSWORD (at least 32 characters)}
       PANEL_DB_PASSWORD_FILE: /run/resolve-panel/agent-password
       PANEL_SESSION_KEY_FILE: /run/resolve-panel/session-key
       PANEL_SECURE_COOKIE: ${PANEL_SECURE_COOKIE:-0}

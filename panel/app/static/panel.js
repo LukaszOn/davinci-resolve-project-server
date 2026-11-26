@@ -1,5 +1,8 @@
 'use strict';
 
+const language = document.getElementById('panel-language');
+language?.addEventListener('change', () => language.form.requestSubmit());
+
 for (const trigger of document.querySelectorAll('[data-open-dialog]')) {
   trigger.addEventListener('click', () => document.getElementById(trigger.dataset.openDialog).showModal());
 }
@@ -20,11 +23,11 @@ for (const trigger of document.querySelectorAll('[data-copy]')) {
     const feedback = document.querySelector('.copy-feedback');
     try {
       await navigator.clipboard.writeText(field.value);
-      feedback.textContent = 'Hasło skopiowane.';
+      feedback.textContent = trigger.dataset.copied;
     } catch (error) {
       field.focus();
       field.select();
-      feedback.textContent = 'Hasło zaznaczone. Skopiuj je skrótem klawiaturowym.';
+      feedback.textContent = trigger.dataset.copyFallback;
     }
   });
 }

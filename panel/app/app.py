@@ -14,19 +14,21 @@ from psycopg import errors
 from psycopg.rows import dict_row
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from translations import LEGACY_SQL_MESSAGES, POLISH
+
 
 def secret_setting(name):
     value = os.environ.get(name, '')
     path = os.environ.get(name + '_FILE', '')
     if value and path:
-        raise RuntimeError(f'Ustaw tylko {name} albo {name}_FILE.')
+        raise RuntimeError(f'Set either {name} or {name}_FILE.')
     if path:
         try:
             value = Path(path).read_text(encoding='utf-8').rstrip('\r\n')
         except (OSError, UnicodeError) as error:
-            raise RuntimeError(f'Nie można odczytać sekretu {name}_FILE.') from error
+            raise RuntimeError(f'Could not read the {name}_FILE secret.') from error
     if len(value) < 32:
-        raise RuntimeError(f'{name} musi mieć co najmniej 32 znaki.')
+        raise RuntimeError(f'{name} must be at least 32 characters long.')
     return value
 
 
@@ -43,16 +45,18 @@ app.config.update(
 )
 ADMIN_PASSWORD = secret_setting('PANEL_ADMIN_PASSWORD').encode()
 DB_PASSWORD = secret_setting('PANEL_DB_PASSWORD')
-PANEL_DISPLAY_NAME = os.environ.get('PANEL_DISPLAY_NAME', '').strip() or 'Project Library Desk'
+PANEL_DISPLAY_NAME = os.environ.get('PANEL_DISPLAY_NAME', '').strip() or 'DaVinci Project Manager'
 PANEL_MANAGED_LIBRARY = os.environ.get('PANEL_MANAGED_LIBRARY', '')
 if len(PANEL_DISPLAY_NAME) > 80:
-    raise RuntimeError('PANEL_DISPLAY_NAME może mieć do 80 znaków.')
+    raise RuntimeError('PANEL_DISPLAY_NAME can be up to 80 characters long.')
 DB_SSLMODE = os.environ.get('PANEL_DB_SSLMODE', 'prefer')
 if DB_SSLMODE not in {'disable', 'prefer', 'require', 'verify-ca', 'verify-full'}:
-    raise RuntimeError('Nieprawidłowy tryb PANEL_DB_SSLMODE.')
+    raise RuntimeError('Invalid PANEL_DB_SSLMODE.')
 DB_ROOT_CERT = os.environ.get('PANEL_DB_SSLROOTCERT', '')
 LOGIN_NAME = re.compile(r'[a-z][a-z0-9_]{1,30}\Z')
-ROLES = {'collaborator': 'Współpracownik', 'administrator': 'Administrator'}
+ROLES = {'collaborator': 'Collaborator', 'administrator': 'Administrator'}
+LANGUAGE_COOKIE = 'dpm_language'
+LANGUAGES = {'en', 'pl'}
 MAX_AVATAR = 128 * 1024
 LOGIN_DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(32))
 FAILED_LOGINS = deque(maxlen=8)
@@ -86,6 +90,8 @@ def protect_routes():
         supplied = request.form.get('csrf', '')
         if not expected or not hmac.compare_digest(expected.encode(), supplied.encode()):
             abort(400)
+    if request.endpoint == 'set_language':
+        return None
     if request.endpoint != 'login' and not session.get('admin'):
         return redirect(url_for('login'))
     if request.endpoint not in ('login', 'logout') and session.get('principal'):
@@ -111,11 +117,39 @@ def protect_response(response):
     return response
 
 
+def current_language():
+    language = request.cookies.get(LANGUAGE_COOKIE, 'en')
+    return language if language in LANGUAGES else 'en'
+
+
+def translate(message, **values):
+    if current_language() == 'pl':
+        message = POLISH.get(message, message)
+    return message.format(**values) if values else message
+
+
+@app.post('/language')
+def set_language():
+    language = request.form.get('language')
+    if language not in LANGUAGES:
+        abort(400)
+    target = url_for('login')
+    if session.get('admin'):
+        target = url_for('index', biblioteka=request.form.get('library', '')[:63] or None,
+                         q=request.form.get('q', '')[:80] or None, osoba=request.form.get('person', '')[:31] or None)
+    response = redirect(target, code=303)
+    response.set_cookie(LANGUAGE_COOKIE, language, max_age=365 * 24 * 60 * 60,
+                        secure=app.config['SESSION_COOKIE_SECURE'], httponly=True, samesite='Strict')
+    return response
+
+
 @app.context_processor
 def form_context():
     return {
         'csrf': session.setdefault('csrf', secrets.token_urlsafe(32)),
-        'roles': ROLES,
+        'roles': {key: translate(label) for key, label in ROLES.items()},
+        'language': current_language(),
+        'tr': translate,
         'panel_display_name': PANEL_DISPLAY_NAME,
         'panel_managed_library': PANEL_MANAGED_LIBRARY,
     }
@@ -131,7 +165,7 @@ def login():
             while FAILED_LOGINS and FAILED_LOGINS[0] <= now - 60:
                 FAILED_LOGINS.popleft()
             if len(FAILED_LOGINS) >= FAILED_LOGINS.maxlen:
-                return render_template('login.html', error='Odczekaj minutę przed następną próbą.'), 429
+                return render_template('login.html', error='Wait one minute before trying again.'), 429
             username = request.form.get('username', '').strip().lower()
             password = request.form.get('password', '')
             member = None
@@ -153,7 +187,7 @@ def login():
                     session.update(principal=username, identity=[member['login_oid'], member['auth_version']])
                 return redirect(url_for('index'))
             FAILED_LOGINS.append(now)
-        return render_template('login.html', error='Sprawdź login i hasło administratora.'), 401
+        return render_template('login.html', error='Check your administrator username and password.'), 401
     return render_template('login.html')
 
 
@@ -187,7 +221,7 @@ def index():
     try:
         libraries, everyone = read_directory()
     except psycopg.Error as error:
-        app.logger.warning('Odczyt katalogu nie powiódł się. SQLSTATE=%s', error.sqlstate)
+        app.logger.warning('Could not read the account directory. SQLSTATE=%s', error.sqlstate)
         return render_template('unavailable.html'), 503
     library_filter = library_filter if library_filter in libraries else ''
     people = [
@@ -235,14 +269,14 @@ def change_person():
     action = request.form.get('action', '')
     username = request.form.get('username', '').strip().lower()
     if not LOGIN_NAME.fullmatch(username):
-        flash('Login musi mieć od 2 do 31 znaków. Zacznij literą i używaj a–z, cyfr oraz podkreśleń.', 'error')
+        flash('Use a username of 2–31 characters. Start with a letter and use a–z, digits, or underscores.', 'error')
         return redirect(url_for('index'), code=303)
     return_url = url_for('index', osoba=username)
     messages = {
-        'grant': 'Dostęp został nadany.', 'revoke': 'Dostęp został odebrany.',
-        'enable': 'Konto jest znów aktywne.', 'disable': 'Konto zostało zablokowane.',
-        'edit': 'Zapisano zmiany konta.', 'password': 'Hasło zostało zmienione.',
-        'create': 'Konto jest gotowe.', 'delete': 'Konto zostało usunięte.',
+        'grant': 'Access granted.', 'revoke': 'Access revoked.',
+        'enable': 'Account unlocked.', 'disable': 'Account locked.',
+        'edit': 'Account changes saved.', 'password': 'Password updated.',
+        'create': 'The account is ready.', 'delete': 'Account deleted.',
     }
     if action not in messages:
         abort(400)
@@ -251,7 +285,7 @@ def change_person():
     new_login = request.form.get('new_username', username).strip().lower()
     role = request.form.get('account_role', 'collaborator')
     if session.get('principal') == username and (action in ('delete', 'disable') or (action == 'edit' and role != 'administrator')):
-        flash('Poproś innego administratora o zmianę roli lub zablokowanie Twojego konta.', 'error')
+        flash('Ask another administrator to change your role or lock your account.', 'error')
         return redirect(return_url, code=303)
 
     generated = False
@@ -261,7 +295,7 @@ def change_person():
         confirmation = request.form.get('password_confirmation', '')
         if password or confirmation:
             if password != confirmation or not 8 <= len(password) <= 128 or '\x00' in password:
-                flash('Wpisz dwa razy to samo hasło od 8 do 128 znaków.', 'error')
+                flash('Enter the same password of 8–128 characters twice.', 'error')
                 return redirect(return_url, code=303)
         else:
             generated = True
@@ -270,7 +304,7 @@ def change_person():
     file = request.files.get('avatar') if action in ('create', 'edit') else None
     photo = file.read(MAX_AVATAR + 1) if file and file.filename else None
     if photo is not None and (len(photo) > MAX_AVATAR or not avatar_type(photo)):
-        flash('Wybierz obraz PNG lub JPEG do 128 KB.', 'error')
+        flash('Select a PNG or JPEG image up to 128 KB.', 'error')
         return redirect(return_url, code=303)
 
     web_hash = generate_password_hash(password) if password is not None else None
@@ -288,11 +322,12 @@ def change_person():
                 for library in dict.fromkeys(request.form.getlist('libraries')):
                     apply(conn, 'grant', username, library=library)
     except errors.RaiseException as error:
-        flash(error.diag.message_primary, 'error')
+        message = error.diag.message_primary
+        flash(LEGACY_SQL_MESSAGES.get(message, message), 'error')
         return redirect(return_url, code=303)
     except psycopg.Error as error:
-        app.logger.warning('Zapis operacji %s nie powiódł się. SQLSTATE=%s', action, error.sqlstate)
-        flash('Nie udało się potwierdzić zapisu. Odśwież stronę i sprawdź aktualny stan.', 'error')
+        app.logger.warning('Could not save operation %s. SQLSTATE=%s', action, error.sqlstate)
+        flash('Could not confirm the change. Refresh the page and check the current state.', 'error')
         return redirect(return_url, code=303)
 
     if action in ('revoke', 'disable'):
@@ -300,8 +335,8 @@ def change_person():
             with database() as conn:
                 conn.execute('SELECT resolve_access.close_revoked_sessions(%s)', (username,))
         except psycopg.Error as error:
-            app.logger.warning('Rozłączenie sesji nie powiodło się. SQLSTATE=%s', error.sqlstate)
-            flash('Dostęp zmieniono. Powtórz operację, jeśli trzeba ponownie zamknąć otwarte połączenia.', 'error')
+            app.logger.warning('Could not close sessions. SQLSTATE=%s', error.sqlstate)
+            flash('Access changed. Repeat the operation if you still need to close open connections.', 'error')
             return redirect(return_url, code=303)
     if action == 'delete':
         return_url = url_for('index')

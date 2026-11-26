@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}Dane logowania{% endblock %}
+{% block title %}{{ tr('Sign-in details') }}{% endblock %}
 {% block body %}
 <main class="single">
   <div class="single-card receipt">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>{{ panel_display_name }}</strong><small>Biblioteki DaVinci Resolve</small></span></div>
-    <h1>{{ 'Konto jest gotowe' if created else 'Hasło zostało zmienione' }}</h1>
-    <p>Skopiuj dane przed zamknięciem strony. Hasło wyświetla się tylko teraz.</p>
-    <label>Login w Resolve<input value="{{ username }}" readonly autocomplete="off"></label>
-    <label>Hasło<input id="new-password" value="{{ password }}" readonly autocomplete="off"></label>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>{{ panel_display_name }}</strong><small>{{ tr('DaVinci Resolve libraries') }}</small></span></div>
+    <h1>{{ tr('Account ready') if created else tr('Password changed') }}</h1>
+    <p>{{ tr('Copy these details before leaving this page. The password is shown only once.') }}</p>
+    <label>{{ tr('Resolve username') }}<input value="{{ username }}" readonly autocomplete="off"></label>
+    <label>{{ tr('Password') }}<input id="new-password" value="{{ password }}" readonly autocomplete="off"></label>
     <div class="receipt-actions">
-      <button class="button primary" type="button" data-copy="new-password">Skopiuj hasło</button>
-      <a class="button secondary" href="{{ return_url }}">Wróć do dostępu</a>
+      <button class="button primary" type="button" data-copy="new-password" data-copied="{{ tr('Password copied.') }}"
+              data-copy-fallback="{{ tr('Password selected. Use the keyboard shortcut to copy it.') }}">{{ tr('Copy password') }}</button>
+      <a class="button secondary" href="{{ return_url }}">{{ tr('Back to project access') }}</a>
     </div>
     <p class="copy-feedback" role="status"></p>
   </div>

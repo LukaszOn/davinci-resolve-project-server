@@ -1,0 +1,14 @@
+<form class="language-picker" action="{{ url_for('set_language') }}" method="post" aria-label="{{ tr('Language') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if request.endpoint == 'index' %}
+    <input type="hidden" name="library" value="{{ library_filter }}">
+    <input type="hidden" name="q" value="{{ query }}">
+    <input type="hidden" name="person" value="{{ selected.username if selected else '' }}">
+  {% endif %}
+  <label for="panel-language">{{ tr('Language') }}</label>
+  <select id="panel-language" name="language">
+    <option value="en" lang="en"{% if language == 'en' %} selected{% endif %}>English</option>
+    <option value="pl" lang="pl"{% if language == 'pl' %} selected{% endif %}>Polski</option>
+  </select>
+  <noscript><button type="submit">{{ tr('Apply') }}</button></noscript>
+</form>
