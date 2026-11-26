@@ -10,8 +10,8 @@ Wybierz jeden kompletny plik dla środowiska **Docker Standalone**.
 
 | Wariant | Plik do wklejenia |
 | --- | --- |
-| PostgreSQL, kopie i pgAdmin | [Podstawowy Compose](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/compose.portainer.yml) |
-| PostgreSQL, kopie, pgAdmin i panel WWW | [Compose z panelem](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/compose.portainer-panel.yml) |
+| PostgreSQL, kopie i pgAdmin | [Podstawowy Compose](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server.yml) |
+| PostgreSQL, kopie, pgAdmin i panel WWW | [Compose z panelem](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server-with-manager.yml) |
 
 1. W Portainerze wybierz **Stacks → Add stack → Web editor**, wpisz nazwę stacka i wklej zawartość wybranego pliku.
 2. W sekcji **Environment variables** wpisz ustawienia z tabeli.

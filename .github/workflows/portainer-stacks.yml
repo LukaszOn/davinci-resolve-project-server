@@ -13,15 +13,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - file: compose.portainer.yml
+          - file: davinci-resolve-project-server.yml
             postgres: 18
             panel: false
             portainer: true
-          - file: compose.portainer-panel.yml
+          - file: davinci-resolve-project-server-with-manager.yml
             postgres: 18
             panel: true
             portainer: true
-          - file: compose.portainer-panel.yml
+          - file: davinci-resolve-project-server-with-manager.yml
             postgres: 16
             panel: true
             portainer: false

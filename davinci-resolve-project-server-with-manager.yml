@@ -110,9 +110,9 @@ services:
       retries: 8
 
   panel-setup:
-    image: davinci-resolve-manager-web:portainer-0.1.0
+    image: davinci-project-manager-web:0.1.1
     build:
-      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#portainer-0.1.0:panel
+      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.1.1:panel
       dockerfile: Dockerfile.portainer
     pull_policy: build
     user: "0:0"
@@ -133,7 +133,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: davinci-resolve-manager-web:portainer-0.1.0
+    image: davinci-project-manager-web:0.1.1
     pull_policy: never
     restart: unless-stopped
     depends_on:
