@@ -67,6 +67,20 @@ jobs:
           after=$(docker compose exec -T resolve-panel sha256sum /run/resolve-panel/session-key /run/resolve-panel/agent-password)
           test "$before" = "$after"
           curl --fail --silent --show-error http://127.0.0.1:3012/healthz
+      - name: Check default English and switch to Polish
+        if: matrix.panel
+        working-directory: ${{ runner.temp }}/deployment-test
+        run: |
+          base=http://127.0.0.1:3012
+          curl --fail --silent --show-error --cookie-jar cookies.txt "$base/login" > login-en.html
+          grep -q '<html lang="en">' login-en.html
+          grep -q 'Sign in to the panel' login-en.html
+          csrf=$(sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' login-en.html | head -n 1)
+          test -n "$csrf"
+          curl --fail --silent --show-error --location --cookie cookies.txt --cookie-jar cookies.txt \
+            --data-urlencode "csrf=$csrf" --data-urlencode language=pl "$base/language" > login-pl.html
+          grep -q '<html lang="pl">' login-pl.html
+          grep -q 'Zaloguj się do panelu' login-pl.html
       - name: Print stack logs on failure
         if: failure()
         run: |

@@ -110,9 +110,9 @@ services:
       retries: 8
 
   panel-setup:
-    image: davinci-project-manager-web:0.1.2
+    image: davinci-project-manager-web:0.2.0
     build:
-      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.1.2:panel
+      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.2.0:panel
       dockerfile: Dockerfile.deployment
     pull_policy: build
     user: "0:0"
@@ -133,7 +133,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: davinci-project-manager-web:0.1.2
+    image: davinci-project-manager-web:0.2.0
     pull_policy: never
     restart: unless-stopped
     depends_on:
