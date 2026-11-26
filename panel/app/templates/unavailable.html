@@ -6,7 +6,7 @@
     <h1>{{ 'Sesja lub formularz wygasł' if invalid else 'Panel chwilowo niedostępny' }}</h1>
     {% if not invalid and panel_managed_library %}
       <p>Panel potrzebuje biblioteki <strong>{{ panel_managed_library }}</strong>. Utwórz ją w DaVinci Resolve albo odtwórz z kopii, odczekaj chwilę i odśwież stronę.</p>
-      <p>Jeśli biblioteka już istnieje, sprawdź logi usługi <code>panel-setup</code> w Portainerze.</p>
+      <p>Jeśli biblioteka już istnieje, sprawdź logi usługi <code>panel-setup</code>.</p>
     {% else %}
       <p>{{ 'Wróć do panelu i spróbuj ponownie.' if invalid else 'Sprawdź połączenie z PostgreSQL i konfigurację panelu.' }}</p>
     {% endif %}

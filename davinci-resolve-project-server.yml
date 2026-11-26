@@ -1,4 +1,4 @@
-# Portainer: Stacks > Add stack > Web editor (Docker Standalone).
+# Wklej ten plik w edytorze stacków lub zapisz jako compose.yml.
 # Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
 # RESOLVE_LIBRARY to nazwa biblioteki, którą utworzysz w Resolve (domyślnie studio).
 # Dla dostępu z innego komputera podaj POSTGRES_BIND_IP (adres hosta Docker).

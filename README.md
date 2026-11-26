@@ -2,20 +2,22 @@
 
 Uruchom na własnym komputerze lub NAS-ie bibliotekę projektów DaVinci Resolve, z której może korzystać kilka stacji montażowych. Docker uruchamia PostgreSQL, automatyczne kopie i pgAdmin. Panel WWW **DaVinci Project Manager** do zarządzania kontami i dostępem można dołączyć później.
 
-[Portainer](#instalacja-w-portainerze) · [Instalacja z pobranego katalogu](#pierwsze-uruchomienie) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
+[Instalacja z jednego pliku](#instalacja-z-jednego-pliku) · [Instalacja z pobranego katalogu](#pierwsze-uruchomienie) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
 
-## Instalacja w Portainerze
+## Instalacja z jednego pliku
 
-Wybierz jeden kompletny plik dla środowiska **Docker Standalone**.
+Wybierz jeden kompletny plik Compose dla nowej instalacji.
 
-| Wariant | Plik do wklejenia |
+| Wariant | Plik Compose |
 | --- | --- |
 | PostgreSQL, kopie i pgAdmin | [Podstawowy Compose](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server.yml) |
 | PostgreSQL, kopie, pgAdmin i panel WWW | [Compose z panelem](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server-with-manager.yml) |
 
-1. W Portainerze wybierz **Stacks → Add stack → Web editor**, wpisz nazwę stacka i wklej zawartość wybranego pliku.
-2. W sekcji **Environment variables** wpisz ustawienia z tabeli.
-3. Kliknij **Deploy the stack**. Przy pierwszym uruchomieniu Docker pobierze obrazy. W wariancie z panelem zbuduje też jego obraz ze źródeł na GitHubie. [Instrukcja Portainera](https://docs.portainer.io/user/docker/stacks/add)
+1. W edytorze stacków utwórz nowy stack, nadaj mu nazwę i wklej zawartość wybranego pliku.
+2. W sekcji zmiennych środowiskowych wpisz ustawienia z tabeli.
+3. Wdróż stack. Docker pobierze obrazy i zbuduje opcjonalny panel ze źródeł na GitHubie.
+
+Z terminala zapisz wybrany plik jako `compose.yml`, wpisz ustawienia do pliku `.env` w tym samym katalogu i uruchom `docker compose up -d`.
 
 | Zmienna | Co podać |
 | --- | --- |

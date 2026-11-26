@@ -1,4 +1,4 @@
-# Portainer: Stacks > Add stack > Web editor (Docker Standalone).
+# Wklej ten plik w edytorze stacków lub zapisz jako compose.yml.
 # Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
 # Dla panelu dodaj też PANEL_ADMIN_PASSWORD (co najmniej 32 znaki).
 # RESOLVE_LIBRARY to nazwa biblioteki, którą utworzysz w Resolve (domyślnie studio).
@@ -110,10 +110,10 @@ services:
       retries: 8
 
   panel-setup:
-    image: davinci-project-manager-web:0.1.1
+    image: davinci-project-manager-web:0.1.2
     build:
-      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.1.1:panel
-      dockerfile: Dockerfile.portainer
+      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.1.2:panel
+      dockerfile: Dockerfile.deployment
     pull_policy: build
     user: "0:0"
     entrypoint: ["sh", "/panel/bootstrap.sh", "configure"]
@@ -133,7 +133,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: davinci-project-manager-web:0.1.1
+    image: davinci-project-manager-web:0.1.2
     pull_policy: never
     restart: unless-stopped
     depends_on:
