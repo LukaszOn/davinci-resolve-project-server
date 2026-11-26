@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Panel dostępu{% endblock %}
+{% block body %}
+<main class="single">
+  <div class="single-card">
+    <h1>{{ 'Sesja lub formularz wygasł' if invalid else 'Panel chwilowo niedostępny' }}</h1>
+    <p>{{ 'Wróć do panelu i spróbuj ponownie.' if invalid else 'Sprawdź połączenie z PostgreSQL i konfigurację panelu.' }}</p>
+    <a class="button primary" href="{{ url_for('index') }}">Wróć do panelu</a>
+  </div>
+</main>
+{% endblock %}

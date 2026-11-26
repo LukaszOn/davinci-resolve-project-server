@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% macro person_avatar(person, size='') -%}
+  {% if person.has_avatar %}
+    <img class="avatar {{ size }}" src="{{ url_for('member_avatar', username=person.username) }}" alt="" loading="lazy">
+  {% else %}
+    <span class="avatar {{ size }}" aria-hidden="true">{{ person.label[:2]|upper }}</span>
+  {% endif %}
+{%- endmacro %}
+{% macro password_fields(prefix) -%}
+  <label>Własne hasło<input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="{{ prefix }}-hint"></label>
+  <label>Powtórz hasło<input type="password" name="password_confirmation" minlength="8" maxlength="128" autocomplete="new-password"></label>
+  <small id="{{ prefix }}-hint">Od 8 do 128 znaków. Zostaw oba pola puste, aby wygenerować hasło.</small>
+{%- endmacro %}
+{% macro role_field(current='collaborator') -%}
+  <label>Rola<select name="account_role" required>
+    {% for value, label in roles.items() %}<option value="{{ value }}" {% if value == current %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></label>
+  <small>Administrator może zarządzać kontami w panelu. Dostęp do bibliotek nadajesz osobno.</small>
+{%- endmacro %}
+{% block body %}
+<a class="skip" href="#main">Przejdź do użytkowników</a>
+<div class="workspace">
+  <aside class="rail">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span><strong>{{ panel_display_name }}</strong><small>Biblioteki DaVinci Resolve</small></span>
+    </a>
+    <nav aria-label="Filtrowanie użytkowników">
+      <a class="rail-link{% if not library_filter %} current{% endif %}" href="{{ url_for('index') }}" {% if not library_filter %}aria-current="page"{% endif %}>
+        <span class="people-icon" aria-hidden="true"></span> Użytkownicy <span class="rail-count">{{ total }}</span>
+      </a>
+      <h2>Biblioteki</h2>
+      {% for library in libraries %}
+        <a class="rail-link{% if library_filter == library %} current{% endif %}" href="{{ url_for('index', biblioteka=library) }}" {% if library_filter == library %}aria-current="page"{% endif %}>
+          <span class="library-icon" aria-hidden="true"></span><span class="rail-library">{{ library }}</span><span class="rail-count">{{ counts[library] }}</span>
+        </a>
+      {% else %}
+        <p class="rail-empty">Brak podłączonych bibliotek</p>
+      {% endfor %}
+    </nav>
+    <form action="{{ url_for('logout') }}" method="post" class="rail-foot">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit"><span aria-hidden="true">↗</span> Wyloguj się</button>
+    </form>
+  </aside>
+
+  <main id="main" class="main">
+    <header class="masthead">
+      <div>
+        <p class="connection"><span></span> Połączono z PostgreSQL</p>
+        <h1>Dostęp do projektów</h1>
+        <p>Dodawaj osoby i wybieraj biblioteki, z którymi mogą pracować w Resolve.</p>
+      </div>
+      <button type="button" class="button primary" data-open-dialog="add-person"><span aria-hidden="true">+</span> Dodaj osobę</button>
+    </header>
+
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div role="status" class="notice {{ category }}">{{ message }}</div>
+    {% endfor %}
+
+    <div class="layout">
+      <section class="card directory" aria-labelledby="directory-title">
+        <header class="directory-head">
+          <div>
+            <h2 id="directory-title">{{ library_filter or 'Użytkownicy' }}</h2>
+            <p>{% if library_filter or query %}Osoby na liście: {{ people|length }}{% else %}Aktywne konta: {{ active }} z {{ total }}{% endif %}</p>
+          </div>
+          <form class="search" method="get" action="{{ url_for('index') }}">
+            {% if library_filter %}<input type="hidden" name="biblioteka" value="{{ library_filter }}">{% endif %}
+            <label class="sr-only" for="search">Szukaj osoby</label>
+            <input id="search" type="search" name="q" maxlength="80" value="{{ query }}" placeholder="Szukaj osoby">
+            <button type="submit" aria-label="Szukaj"><span class="search-icon" aria-hidden="true"></span></button>
+          </form>
+        </header>
+        {% if people %}
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Osoba</th><th scope="col">Rola</th><th scope="col">Biblioteki</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Szczegóły</span></th></tr></thead>
+              <tbody>
+                {% for person in people %}
+                  <tr class="{% if selected and selected.username == person.username %}selected{% endif %}">
+                    <th scope="row">
+                      <a class="identity" href="{{ url_for('index', osoba=person.username, biblioteka=library_filter or None, q=query or None) }}#details">
+                        {{ person_avatar(person) }}
+                        <span><strong>{{ person.label }}</strong><small>{{ person.username }}</small></span>
+                      </a>
+                    </th>
+                    <td><span class="member-role{% if person.account_role == 'administrator' %} is-admin{% endif %}">{{ roles[person.account_role] }}</span></td>
+                    <td><span class="library-count">{{ person.libraries|length }}</span></td>
+                    <td>{% if person.enabled %}<span class="state active">Aktywne</span>{% else %}<span class="state muted">Zablokowane</span>{% endif %}</td>
+                    <td><a class="arrow" href="{{ url_for('index', osoba=person.username, biblioteka=library_filter or None, q=query or None) }}#details" aria-label="Dostęp dla {{ person.label }}">→</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty">
+            <h3>{% if query %}Brak wyników{% elif library_filter %}Brak przypisanych osób{% else %}Dodaj pierwszą osobę{% endif %}</h3>
+            <p>{% if query %}Wyszukaj po nazwie osoby lub loginie.{% elif library_filter %}Wybierz osobę z listy użytkowników i nadaj jej dostęp do tej biblioteki.{% else %}Każda osoba otrzyma własny login do DaVinci Resolve.{% endif %}</p>
+            {% if query or library_filter %}<a class="button secondary" href="{{ url_for('index') }}">Pokaż wszystkich</a>{% endif %}
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="card details" id="details" tabindex="-1" aria-labelledby="details-title">
+        <h2 id="details-title">Szczegóły dostępu</h2>
+        {% if selected %}
+          <div class="profile">
+            {{ person_avatar(selected, 'big') }}
+            <div><h3>{{ selected.label }}</h3><p>{{ selected.username }} · {{ roles[selected.account_role] }}</p></div>
+          </div>
+          <h3 class="section-label">Biblioteki tej osoby</h3>
+          <ul class="assignments">
+            {% for library in libraries %}
+              {% set has_access = library in selected.libraries %}
+              <li>
+                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ 'Przypisano' if has_access else 'Bez dostępu' }}</small></div>
+                <form method="post" action="{{ url_for('change_person') }}" {% if has_access %}data-confirm="Odebrać dostęp do tej biblioteki? Otwarte połączenia zostaną zamknięte."{% endif %}>
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <input type="hidden" name="username" value="{{ selected.username }}">
+                  <input type="hidden" name="library" value="{{ library }}">
+                  <button type="submit" class="button small {% if has_access %}secondary{% else %}tinted{% endif %}" name="action" value="{{ 'revoke' if has_access else 'grant' }}" aria-label="{{ 'Odbierz' if has_access else 'Nadaj' }} dostęp do {{ library }}">{{ 'Odbierz' if has_access else 'Nadaj' }}</button>
+                </form>
+              </li>
+            {% else %}
+              <li class="empty-detail">Podłącz bibliotekę, aby nadawać dostęp.</li>
+            {% endfor %}
+          </ul>
+          <div class="account-actions">
+            <button type="button" class="button secondary small" data-open-dialog="edit-person">Edytuj konto</button>
+            <button type="button" class="button secondary small" data-open-dialog="password-person">Zmień hasło</button>
+            {% if selected.username != session.get('principal') %}
+            <form method="post" action="{{ url_for('change_person') }}" {% if selected.enabled %}data-confirm="Zablokować to konto i zakończyć jego otwarte połączenia?"{% endif %}>
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+              <button class="button {% if selected.enabled %}danger{% else %}tinted{% endif %} small" type="submit" name="action" value="{{ 'disable' if selected.enabled else 'enable' }}">{{ 'Zablokuj konto' if selected.enabled else 'Odblokuj konto' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('change_person') }}" data-confirm="Usunąć konto {{ selected.label }}? Użytkownik utraci dostęp do wszystkich bibliotek. Projekty zostaną zachowane.">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+              <button class="button danger small" type="submit" name="action" value="delete">Usuń konto</button>
+            </form>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="empty-detail">Wybierz osobę, aby sprawdzić jej biblioteki i zmienić dostęp.</p>
+        {% endif %}
+      </section>
+    </div>
+  </main>
+</div>
+
+<dialog id="add-person" aria-labelledby="add-title">
+  <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
+    <header><h2 id="add-title">Dodaj osobę</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Nazwa osoby<input name="label" maxlength="80" required placeholder="np. Anna Kowalska" autofocus></label>
+    <label>Login w Resolve<input name="username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" aria-describedby="login-hint" required placeholder="np. anna"></label>
+    <small id="login-hint">Zacznij małą literą. Możesz dodać cyfry i podkreślenia.</small>
+    {{ role_field() }}
+    {{ password_fields('create-password') }}
+    <label>Zdjęcie w panelu (opcjonalne)<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+    <small>PNG lub JPEG do 128 KB.</small>
+    {% if libraries %}
+      <fieldset><legend>Dostęp do bibliotek</legend>
+        {% for library in libraries %}
+          <label class="checkbox"><input type="checkbox" name="libraries" value="{{ library }}" {% if library_filter == library %}checked{% endif %}> {{ library }}</label>
+        {% endfor %}
+      </fieldset>
+    {% endif %}
+    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="create" type="submit">Utwórz konto</button></footer>
+  </form>
+</dialog>
+{% if selected %}
+<dialog id="edit-person" aria-labelledby="edit-title">
+  <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
+    <header><h2 id="edit-title">Edytuj konto</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+    <label>Nazwa osoby<input name="label" maxlength="80" value="{{ selected.label }}" required autofocus></label>
+    <label>Login w Resolve<input name="new_username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" value="{{ selected.username }}" required></label>
+    {% if selected.username == session.get('principal') %}
+      <input type="hidden" name="account_role" value="administrator">
+    {% else %}
+      {{ role_field(selected.account_role) }}
+    {% endif %}
+    <label>Zdjęcie w panelu<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+    <small>PNG lub JPEG do 128 KB.</small>
+    {% if selected.has_avatar %}<label class="checkbox"><input type="checkbox" name="clear_photo" value="1"> Usuń zdjęcie</label>{% endif %}
+    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="edit" type="submit">Zapisz zmiany</button></footer>
+  </form>
+</dialog>
+<dialog id="password-person" aria-labelledby="password-title">
+  <form method="post" action="{{ url_for('change_person') }}" class="add-form">
+    <header><h2 id="password-title">Zmień hasło</h2><button class="close" type="button" data-close-dialog aria-label="Zamknij">×</button></header>
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+    {{ password_fields('update-password') }}
+    <footer><button type="button" class="button secondary" data-close-dialog>Anuluj</button><button class="button primary" name="action" value="password" type="submit">Zapisz hasło</button></footer>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

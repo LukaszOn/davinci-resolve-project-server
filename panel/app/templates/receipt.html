@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Dane logowania{% endblock %}
+{% block body %}
+<main class="single">
+  <div class="single-card receipt">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>{{ panel_display_name }}</strong><small>Biblioteki DaVinci Resolve</small></span></div>
+    <h1>{{ 'Konto jest gotowe' if created else 'Hasło zostało zmienione' }}</h1>
+    <p>Skopiuj dane przed zamknięciem strony. Hasło wyświetla się tylko teraz.</p>
+    <label>Login w Resolve<input value="{{ username }}" readonly autocomplete="off"></label>
+    <label>Hasło<input id="new-password" value="{{ password }}" readonly autocomplete="off"></label>
+    <div class="receipt-actions">
+      <button class="button primary" type="button" data-copy="new-password">Skopiuj hasło</button>
+      <a class="button secondary" href="{{ return_url }}">Wróć do dostępu</a>
+    </div>
+    <p class="copy-feedback" role="status"></p>
+  </div>
+</main>
+{% endblock %}

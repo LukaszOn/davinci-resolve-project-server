@@ -1,23 +1,37 @@
----
 name: Stack Healthcheck
+
 on:
   push:
   pull_request:
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   test:
-    name: Test Stack
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [16, 17, 18]
+    env:
+      POSTGRES_VERSION: ${{ matrix.postgres }}
+      POSTGRES_PASSWORD: ci-only-project-server
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ci-only-admin-console
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Deploy the stack, timeout if not healthy after 2m
-        run: timeout 120 docker compose up --quiet-pull --wait
-      - name: Check creating database
-        run: docker compose logs | grep "CREATE DATABASE"
-      - name: Check database creation
-        run: docker compose logs | grep "Success. You can now start the database server"
-      - name: Check postgres init
-        run: docker compose logs | grep "PostgreSQL init process complete; ready for start up."
+        with:
+          persist-credentials: false
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Check PostgreSQL, pgAdmin and backup
+        run: |
+          test "$(docker compose exec -T postgres psql -U postgres -d database -Atc 'SHOW server_version_num;' | cut -c 1-2)" = "$POSTGRES_VERSION"
+          curl --retry 15 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3001/misc/ping
+          docker compose exec -T pgbackups /backup.sh
+          docker compose exec -T pgbackups sh -ec 'archive=$(find /backups/daily -name "*.backup" -type f | head -n 1); test -n "$archive"; pg_restore --list "$archive" >/dev/null'
+      - name: Print logs on failure
+        if: failure()
+        run: docker compose logs --tail 80

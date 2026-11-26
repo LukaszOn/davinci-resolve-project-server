@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dostęp do projektów{% endblock %} · {{ panel_display_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='panel.css') }}">
+  <script src="{{ url_for('static', filename='panel.js') }}" defer></script>
+</head>
+<body>
+  {% block body %}{% endblock %}
+</body>
+</html>

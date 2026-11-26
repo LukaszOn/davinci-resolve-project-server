@@ -1,12 +1,9 @@
-FROM python:3.15-slim
-
-RUN useradd -m pgadmin-config-creator
-RUN mkdir /app && mkdir /config
-COPY . /app
-RUN chown -R pgadmin-config-creator:pgadmin-config-creator /app /config
-
-USER pgadmin-config-creator
+FROM python:3.13-slim
 
 WORKDIR /app
+RUN useradd --user-group pgadmin-config-creator \
+    && install -d -o pgadmin-config-creator -g pgadmin-config-creator /config
+COPY app.py .
+USER pgadmin-config-creator
+
 CMD ["python", "app.py"]
-HEALTHCHECK CMD test -f /config/servers.json || exit 1

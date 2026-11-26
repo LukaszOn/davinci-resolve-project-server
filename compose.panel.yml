@@ -1,0 +1,25 @@
+services:
+  resolve-panel:
+    build: ./panel
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ./panel/.env
+    ports:
+      - target: 8080
+        published: "${PANEL_PORT:-3012}"
+        host_ip: ${PANEL_BIND_IP:-127.0.0.1}
+        protocol: tcp
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

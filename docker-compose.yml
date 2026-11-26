@@ -1,99 +1,98 @@
----
-version: "3.8"
-x-common:
-  database: &db-environment
-    POSTGRES_DB: &pg-db database
-    POSTGRES_USER: &pg-user postgres
-    POSTGRES_PASSWORD: DaVinci
-    TZ: America/Chicago
-    POSTGRES_LOCATION: &db-location "./db:/var/lib/postgresql/data"
-  backup: &backup-environment
-    SCHEDULE: "@daily"
-    BACKUP_KEEP_DAYS: 7
-    BACKUP_KEEP_WEEKS: 4
-    BACKUP_KEEP_MONTHS: 6
-    BACKUP_LOCATION: &bk-location "./backups:/backups"
-  admin: &admin-environment
-    PGADMIN_DEFAULT_EMAIL: admin@admin.com
-    PGADMIN_DEFAULT_PASSWORD: root
-    PGADMIN_PORT: &pgadmin-port "3001:80"
-#
-# ------------------------------------------------------------------------------------------
-# DANGER ZONE BELOW
-#
-# The remainder of this file likely does not need to be changed.
-# Please only make modifications
-# below if you understand what you are doing.
-#
+x-postgres: &postgres-environment
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD w pliku .env}
+  TZ: ${TZ:-UTC}
+
 services:
   postgres:
-    container_name: resolve_pgsql
-    image: postgres:13
-    restart: always
+    image: postgres:${POSTGRES_VERSION:-18}
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - target: 5432
+        published: "5432"
+        host_ip: ${POSTGRES_BIND_IP:-127.0.0.1}
+        protocol: tcp
     environment:
-      <<: [*db-environment]
+      <<: *postgres-environment
+      POSTGRES_DB: ${POSTGRES_DB:-database}
+      PGDATA: /var/lib/postgresql/${POSTGRES_VERSION:-18}/docker
     volumes:
-      - *db-location
+      - type: bind
+        source: ${POSTGRES_DATA_DIR:-./data/postgres-${POSTGRES_VERSION:-18}}
+        target: /var/lib/postgresql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", *pg-user, "-d", *pg-db]
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  pgbackups:
+    image: prodrigestivill/postgres-backup-local:${POSTGRES_VERSION:-18}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *postgres-environment
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${BACKUP_DATABASES:-${POSTGRES_DB:-database}}
+      SCHEDULE: ${BACKUP_SCHEDULE:-30 2 * * *}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+      POSTGRES_EXTRA_OPTS: --blobs --format=custom --quote-all-identifiers
+      BACKUP_SUFFIX: .backup
+    volumes:
+      - "${BACKUP_DIR:-./backups}:/backups"
+    healthcheck:
       interval: 10s
       timeout: 5s
       retries: 5
-  pgbackups:
-    container_name: resolve_pgbackup
-    image: prodrigestivill/postgres-backup-local:13
-    restart: always
-    volumes:
-      - *bk-location
-    depends_on:
-      - postgres
-    environment:
-      <<: [*db-environment, *backup-environment]
-      POSTGRES_HOST: postgres
-      POSTGRES_EXTRA_OPTS: --blobs --format=custom --quote-all-identifiers
-      BACKUP_SUFFIX: .backup
-      HEALTHCHECK_PORT: 8080
-    healthcheck:
-      interval: 30s
-  pgadmin:
-    container_name: resolve_pgadmin
-    image: dpage/pgadmin4
-    restart: always
-    environment:
-      <<: [*admin-environment]
-      PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
-    ports:
-      - *pgadmin-port
-    volumes:
-      - pgadmin-config:/pgadmin4-config
-      - pgadmin:/var/lib/pgadmin
-      - *bk-location
-    entrypoint: "/bin/sh"
-    command:
-      - -c
-      - |
-        mkdir -p /var/lib/pgadmin/storage/$${PGADMIN_DEFAULT_EMAIL//@/_}/
-        ln -s /backups /var/lib/pgadmin/storage/$${PGADMIN_DEFAULT_EMAIL//@/_}/
-        /entrypoint.sh
-    depends_on:
-      - postgres
-      - pgadmin-config
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget --no-verbose --tries=1 --spider http://localhost/misc/ping || exit 1",
-        ]
+
   pgadmin-config:
-    container_name: resolve_pgadmin-config-creator
-    image: ghcr.io/elliotmatson/pgadmin-config-creator:latest
-    restart: on-failure
+    build: ./pgadmin-config-creator
     environment:
-      <<: [*db-environment]
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
     volumes:
       - pgadmin-config:/config
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgadmin-config:
+        condition: service_completed_successfully
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Ustaw PGADMIN_DEFAULT_EMAIL w pliku .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Ustaw PGADMIN_DEFAULT_PASSWORD w pliku .env}
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
+    ports:
+      - target: 80
+        published: "${PGADMIN_PORT:-3001}"
+        host_ip: ${PGADMIN_BIND_IP:-127.0.0.1}
+        protocol: tcp
+    volumes:
+      - pgadmin-config:/pgadmin4-config:ro
+      - pgadmin:/var/lib/pgadmin
+      - "${BACKUP_DIR:-./backups}:/backups:ro"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        account="$$(printf '%s' "$${PGADMIN_DEFAULT_EMAIL}" | tr '@' '_')"
+        storage="/var/lib/pgadmin/storage/$$account"
+        mkdir -p "$$storage"
+        if [ ! -e "$$storage/backups" ] && [ ! -L "$$storage/backups" ]; then
+          ln -s /backups "$$storage/backups"
+        fi
+        exec /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=4).close()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 8
 
 volumes:
   pgadmin-config:
