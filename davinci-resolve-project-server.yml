@@ -4,7 +4,7 @@
 # For access from another computer, set POSTGRES_BIND_IP to the Docker host address.
 x-postgres: &postgres-environment
   POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
   TZ: ${TZ:-UTC}
 
 services:
@@ -80,8 +80,8 @@ services:
       pgadmin-config:
         condition: service_completed_successfully
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Ustaw PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Ustaw PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
     ports:
       - target: 80

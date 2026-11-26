@@ -1,6 +1,6 @@
 x-postgres: &postgres-environment
   POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD w pliku .env}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
   TZ: ${TZ:-UTC}
 
 services:
@@ -65,8 +65,8 @@ services:
       pgadmin-config:
         condition: service_completed_successfully
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Ustaw PGADMIN_DEFAULT_EMAIL w pliku .env}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Ustaw PGADMIN_DEFAULT_PASSWORD w pliku .env}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in .env}
       PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
     ports:
       - target: 80

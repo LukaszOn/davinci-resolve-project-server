@@ -117,13 +117,14 @@
           <ul class="assignments">
             {% for library in libraries %}
               {% set has_access = library in selected.libraries %}
+              {% set direct_access = library in selected.direct_libraries|default(selected.libraries) %}
               <li>
-                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ tr('Assigned') if has_access else tr('No access') }}</small></div>
-                <form method="post" action="{{ url_for('change_person') }}" {% if has_access %}data-confirm="{{ tr('Revoke access to this library? Open connections will be closed.') }}"{% endif %}>
+                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ tr('Assigned') if direct_access else tr('Access through a group') if has_access else tr('No access') }}</small></div>
+                <form method="post" action="{{ url_for('change_person') }}" {% if direct_access %}data-confirm="{{ tr('Revoke direct access? Open connections will be closed if this account loses access to the library.') }}"{% endif %}>
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="username" value="{{ selected.username }}">
                   <input type="hidden" name="library" value="{{ library }}">
-                  <button type="submit" class="button small {% if has_access %}secondary{% else %}tinted{% endif %}" name="action" value="{{ 'revoke' if has_access else 'grant' }}" aria-label="{{ tr('Revoke access to {library}' if has_access else 'Grant access to {library}', library=library) }}">{{ tr('Revoke') if has_access else tr('Grant') }}</button>
+                  <button type="submit" class="button small {% if direct_access %}secondary{% else %}tinted{% endif %}" name="action" value="{{ 'revoke' if direct_access else 'grant' }}" aria-label="{{ tr('Revoke access to {library}' if direct_access else 'Grant access to {library}', library=library) }}">{{ tr('Revoke') if direct_access else tr('Grant direct') if has_access else tr('Grant') }}</button>
                 </form>
               </li>
             {% else %}

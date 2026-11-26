@@ -200,7 +200,17 @@ def logout():
 def read_directory():
     with database() as conn:
         libraries = [row['name'] for row in conn.execute('SELECT name FROM resolve_access.available_libraries ORDER BY name')]
-        people = conn.execute('SELECT * FROM resolve_access.directory ORDER BY lower(label), username').fetchall()
+        groups_available = conn.execute("""
+            SELECT to_regclass('resolve_access.member_direct_access') IS NOT NULL AS available
+        """).fetchone()['available']
+        if groups_available:
+            people = conn.execute("""
+                SELECT d.*, a.libraries AS direct_libraries
+                FROM resolve_access.directory d JOIN resolve_access.member_direct_access a USING (username)
+                ORDER BY lower(d.label), d.username
+            """).fetchall()
+        else:
+            people = conn.execute('SELECT * FROM resolve_access.directory ORDER BY lower(label), username').fetchall()
     return libraries, people
 
 
@@ -318,6 +328,12 @@ def change_person():
                 ))
             else:
                 apply(conn, action, username, library=library)
+            if action == 'revoke' and conn.execute("""
+                SELECT EXISTS (
+                    SELECT FROM resolve_access.directory WHERE username = %s AND %s = ANY(libraries)
+                ) AS still_assigned
+            """, (username, library)).fetchone()['still_assigned']:
+                messages['revoke'] = 'Direct access revoked. Group access is still active.'
             if action == 'create':
                 for library in dict.fromkeys(request.form.getlist('libraries')):
                     apply(conn, 'grant', username, library=library)

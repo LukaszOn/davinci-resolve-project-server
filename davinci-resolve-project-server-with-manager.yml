@@ -5,7 +5,7 @@
 # For access from another computer, set POSTGRES_BIND_IP to the Docker host address.
 x-postgres: &postgres-environment
   POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
   TZ: ${TZ:-UTC}
 
 services:
@@ -81,8 +81,8 @@ services:
       pgadmin-config:
         condition: service_completed_successfully
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Ustaw PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Ustaw PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
     ports:
       - target: 80
@@ -110,9 +110,9 @@ services:
       retries: 8
 
   panel-setup:
-    image: davinci-project-manager-web:0.2.0
+    image: davinci-project-manager-web:0.3.0
     build:
-      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.2.0:panel
+      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.3.0:panel
       dockerfile: Dockerfile.deployment
     pull_policy: build
     user: "0:0"
@@ -124,7 +124,7 @@ services:
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       RESOLVE_LIBRARY: ${RESOLVE_LIBRARY:-studio}
     volumes:
       - "${POSTGRES_DATA_DIR:-pgdata}:/var/lib/postgresql"
@@ -133,7 +133,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: davinci-project-manager-web:0.2.0
+    image: davinci-project-manager-web:0.3.0
     pull_policy: never
     restart: unless-stopped
     depends_on:

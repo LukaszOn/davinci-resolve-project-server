@@ -4,20 +4,21 @@
 
 Uruchom na własnym komputerze lub NAS-ie bibliotekę projektów DaVinci Resolve, z której może korzystać kilka stacji montażowych. Docker uruchamia PostgreSQL, automatyczne kopie i pgAdmin. Panel WWW **DaVinci Project Manager** do zarządzania kontami i dostępem można dołączyć później.
 
-[Instalacja z jednego pliku](#instalacja-z-jednego-pliku) · [Instalacja z pobranego katalogu](#pierwsze-uruchomienie) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
+| Co chcesz uruchomić | Od czego zacząć |
+| --- | --- |
+| PostgreSQL, automatyczne kopie i pgAdmin | [Pobierz podstawowy Compose](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server.yml) |
+| Ten sam zestaw z panelem WWW do zarządzania dostępem | [Pobierz Compose z panelem](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server-with-manager.yml) |
+| Zestaw do samodzielnego zbudowania i dostosowania | [Zainstaluj z ZIP-a repozytorium](#pierwsze-uruchomienie) |
+
+[Instalacja z jednego pliku](#instalacja-z-jednego-pliku) · [Panel WWW na Unraidzie](#unraid-community-apps) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
 
 ## Instalacja z jednego pliku
 
-Wybierz jeden kompletny plik Compose dla nowej instalacji.
-
-| Wariant | Plik Compose |
-| --- | --- |
-| PostgreSQL, kopie i pgAdmin | [Podstawowy Compose](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server.yml) |
-| PostgreSQL, kopie, pgAdmin i panel WWW | [Compose z panelem](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server-with-manager.yml) |
-
 1. W edytorze stacków utwórz nowy stack, nadaj mu nazwę i wklej zawartość wybranego pliku.
 2. W sekcji zmiennych środowiskowych wpisz ustawienia z tabeli.
-3. Wdróż stack. Docker pobierze obrazy i zbuduje opcjonalny panel ze źródeł na GitHubie.
+3. Wdróż stack. Docker pobierze obrazy i zbuduje panel ze źródeł wskazanych w Compose, jeśli wybierzesz wariant z panelem.
+
+Python 3 instalujesz u siebie tylko wtedy, gdy [ręcznie dodajesz panel do instalacji z ZIP-a](#opcjonalny-panel-www).
 
 Z terminala zapisz wybrany plik jako `compose.yml`, wpisz ustawienia do pliku `.env` w tym samym katalogu i uruchom `docker compose up -d`.
 
@@ -30,25 +31,21 @@ Z terminala zapisz wybrany plik jako `compose.yml`, wpisz ustawienia do pliku `.
 | `PANEL_ADMIN_PASSWORD` | Tylko w wariancie z panelem. Osobne hasło o długości co najmniej 32 znaków. |
 | `POSTGRES_VERSION` | Opcjonalnie `16`, `17` albo `18`. Domyślnie `18`. |
 
-W DaVinci Resolve wybierz **Network → Add Project Library → Create**, podaj adres hosta i nazwę z `RESOLVE_LIBRARY`. Serwer używa portu `5432`. pgAdmin otworzysz pod adresem hosta z portem `3001`.
+W DaVinci Resolve wybierz **Network → Add Project Library → Create**, podaj adres hosta i nazwę z `RESOLVE_LIBRARY`. Harmonogram kopii domyślnie korzysta z tej nazwy. Jeśli chcesz kopiować inną bibliotekę lub kilka bibliotek, ustaw `BACKUP_DATABASES`.
 
-Jeśli wybrałeś wariant z panelem, otwórz adres hosta z portem `3012`. Zostaw pole loginu puste i podaj `PANEL_ADMIN_PASSWORD`. Gdy biblioteka pojawi się w PostgreSQL, osobna usługa `panel-setup` zarejestruje ją automatycznie i zakończy pracę. Panel dostaje adres bazy z Compose i łączy się przez własne konto techniczne. Kopie używają tej samej nazwy biblioteki, chyba że ustawisz osobno `BACKUP_DATABASES`.
+PostgreSQL używa portu TCP `5432`. Domyślnie pod adresem z `POSTGRES_BIND_IP` otworzysz pgAdmin na porcie `3001`, a opcjonalny panel WWW na `3012`. Przy logowaniu do panelu zostaw login pusty i podaj `PANEL_ADMIN_PASSWORD`. Po utworzeniu biblioteki w Resolve kontener `panel-setup` zarejestruje ją i zakończy pracę. Panel pobiera adres bazy z Compose i łączy się własnym kontem technicznym.
 
 Dane i kopie domyślnie trafiają do woluminów Dockera. Jeśli chcesz zapisywać kopie w konkretnym katalogu na NAS-ie, ustaw `BACKUP_DIR` na jego pełną ścieżkę. Te pliki Compose są przeznaczone do nowej instalacji. Przy przenoszeniu istniejącej bazy użyj kopii i odtworzenia w nowym stacku.
 
-### Instalacja z pobranego katalogu
+## Pierwsze uruchomienie
+
+Pobierz ZIP całego repozytorium lub wybierz **Code → Download ZIP** nad listą plików na GitHubie. Rozpakuj cały katalog na komputerze z Dockerem. Compose korzysta także z plików w podkatalogach. [Pobierz ZIP](https://github.com/LukaszOn/davinci-resolve-project-server/archive/refs/heads/main.zip)
 
 | Plik | Do czego służy |
 | --- | --- |
 | [`docker-compose.yml`](docker-compose.yml) | Podstawowa instalacja z bazą, kopiami i pgAdmin. |
 | [`.env.example`](.env.example) | Wzór ustawień. Skopiuj go do `.env` i uzupełnij własne wartości. |
 | [`compose.panel.yml`](compose.panel.yml) | Rozszerzenie podstawowej instalacji o panel WWW. |
-
-[**Pobierz ZIP całego repozytorium**](https://github.com/LukaszOn/davinci-resolve-project-server/archive/refs/heads/main.zip) lub wybierz **Code → Download ZIP** nad listą plików na GitHubie. Rozpakuj cały katalog na komputerze z Dockerem. Compose korzysta także z plików w podkatalogach.
-
-[Pierwsze uruchomienie](#pierwsze-uruchomienie) · [Ręczne dołączenie panelu WWW](#opcjonalny-panel-www)
-
-## Pierwsze uruchomienie
 
 ### 1. Przygotuj ustawienia
 
@@ -114,11 +111,11 @@ W **Project Manager** otwórz listę bibliotek, wybierz **Network → Add Projec
 
 Kliknij **Create**, utwórz projekt testowy i zapisz go. Do istniejącej biblioteki użyj zakładki **Connect** i podaj jej dokładną nazwę wraz z danymi konta, które ma do niej dostęp. [Instrukcja Blackmagic Design](https://documents.blackmagicdesign.com/UserManuals/DaVinciResolveReferenceManual.pdf)
 
-Zwykła baza `database` powstaje przy starcie PostgreSQL. Bibliotekę projektów tworzy Resolve w tym kroku.
+PostgreSQL przy starcie tworzy bazę `database`. Bibliotekę projektów tworzysz w tym kroku z poziomu Resolve. Wpisz jej nazwę w `BACKUP_DATABASES` w pliku `.env`. Dopóki tego nie zrobisz, ta instalacja będzie kopiować bazę startową wskazaną przez `POSTGRES_DB` (domyślnie `database`).
 
 ### 4. Sprawdź pierwszą kopię
 
-Dopiero po utworzeniu biblioteki wpisz jej nazwę w `BACKUP_DATABASES` w pliku `.env`, np. `BACKUP_DATABASES=studio_test`. Przy kilku bibliotekach rozdziel ich nazwy przecinkami. Zastosuj ustawienia i uruchom kopię ręcznie.
+Sprawdź, czy w `.env` widnieje nazwa z Resolve, np. `BACKUP_DATABASES=studio_test`. Przy kilku bibliotekach rozdziel nazwy przecinkami. Zastosuj ustawienie i uruchom kopię ręcznie.
 
 ```sh
 docker compose up -d pgbackups
@@ -139,7 +136,9 @@ Adresy stron dotyczą przeglądarki uruchomionej na komputerze z Dockerem. Na NA
 
 ## Opcjonalny panel WWW
 
-Panel dodaje w przeglądarce zarządzanie kontami i dostępem do bibliotek. Domyślnie używa angielskiego. Aby zmienić język, wybierz **Polski** na ekranie logowania lub na pasku bocznym. Może działać obok [DaVinci Project Manager na desktop](https://github.com/LukaszOn/davinci-project-manager) na tej samej instancji PostgreSQL i bazie rejestru.
+Panel WWW i aplikacja desktopowa mogą korzystać z tego samego rejestru kont w PostgreSQL. Gdy utworzysz grupy w aplikacji desktopowej, panel WWW pokaże, kto ma dostęp przez grupę. Odebranie bezpośredniego przydziału pozostawia dostęp grupowy. [Konfiguracja grup w aplikacji desktopowej](https://github.com/LukaszOn/davinci-project-manager/blob/main/GUIDE.md#user-groups)
+
+Panel domyślnie używa angielskiego. Wybierz **Polski** na ekranie logowania lub na pasku bocznym.
 
 <details>
 <summary>Jak włączyć panel</summary>
@@ -165,7 +164,7 @@ Otwórz adres panelu z tabeli powyżej. Aby ustawić jego adres lub port, zmień
 
 ## Unraid Community Apps
 
-Szablon Unraid instaluje panel WWW i łączy go z istniejącym serwerem PostgreSQL. Przed otwarciem panelu przygotuj moduł dostępu i zarejestruj bibliotekę.
+Szablon Unraid instaluje panel WWW. Panel potrzebuje działającego PostgreSQL z modułem dostępu i co najmniej jedną zarejestrowaną biblioteką Resolve. Jeśli masz już moduł, skorzystaj z jego konfiguracji.
 
 Jeśli PostgreSQL działa w lokalnym kontenerze i konfigurujesz moduł po raz pierwszy, uruchom poniższe polecenie w katalogu repozytorium. Podstaw nazwę kontenera serwera i nazwę biblioteki.
 
@@ -175,11 +174,19 @@ PANEL_POSTGRES_CONTAINER=your-postgres \
   sh panel/install-db.sh studio_test
 ```
 
-Instalator zapisze dane dostępowe w `panel/.env`. Jeśli masz już działający panel lub moduł dostępu, użyj zapisanej konfiguracji.
+Instalator zapisze dane panelu w `panel/.env`. Jeśli administrujesz PostgreSQL z konta o nazwie innej niż `postgres`, do polecenia dodaj `PANEL_POSTGRES_ADMIN` z nazwą tego konta.
 
-W **Apps** wyszukaj **DaVinci Project Manager** i wybierz **Install**. W polu **PostgreSQL host** wpisz adres dostępny z kontenera. Przepisz `PANEL_DB_PASSWORD`, `PANEL_ADMIN_PASSWORD` i `PANEL_SESSION_KEY` z konfiguracji modułu. Po instalacji otwórz **WebUI**, zostaw pustą nazwę użytkownika i wpisz hasło administratora panelu. Przy aktualizacji obrazu zachowaj ustawienia PostgreSQL i klucz sesji.
+Jeśli widzisz **DaVinci Project Manager** w **Apps**, wybierz **Install**. W przeciwnym razie zapisz szablon w `/boot/config/plugins/dockerMan/templates-user/` i wybierz go w **Docker → Add Container**. [Szablon XML](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.xml)
 
-Przed udostępnieniem aplikacji w katalogu możesz zapisać [szablon XML](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.xml) w `/boot/config/plugins/dockerMan/templates-user/` i wybrać go w **Docker → Add Container**.
+W polu **PostgreSQL host** wpisz adres dostępny z kontenera panelu. Pozostałe wartości przepisz z `panel/.env` lub z konfiguracji działającego panelu.
+
+| Pole w Unraidzie | Ustawienie do przepisania |
+| --- | --- |
+| **PostgreSQL service password** | `PANEL_DB_PASSWORD` |
+| **Panel administrator password** | `PANEL_ADMIN_PASSWORD` |
+| **Session signing key** | `PANEL_SESSION_KEY` |
+
+Otwórz **WebUI**, zostaw login pusty i wpisz hasło administratora panelu. Przy aktualizacji obrazu zachowaj ustawienia PostgreSQL i klucz sesji.
 
 ## Dodatkowe ustawienia
 
