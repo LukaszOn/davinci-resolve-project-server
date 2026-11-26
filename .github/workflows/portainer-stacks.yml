@@ -75,9 +75,9 @@ jobs:
       - name: Verify first library and its backup
         working-directory: ${{ runner.temp }}/portainer-test
         run: |
-          curl --retry 45 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3001/misc/ping
+          curl --retry 45 --retry-delay 2 --retry-all-errors --fail --silent --show-error http://127.0.0.1:3001/misc/ping
           if [ "${{ matrix.panel }}" = true ]; then
-            curl --retry 30 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3012/login >/dev/null
+            curl --retry 30 --retry-delay 2 --retry-all-errors --fail --silent --show-error http://127.0.0.1:3012/login >/dev/null
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3012/healthz)" = 503
           fi
           docker compose exec -T postgres createdb -U postgres "$RESOLVE_LIBRARY"
