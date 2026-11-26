@@ -1,0 +1,72 @@
+name: Portainer stacks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: compose.portainer.yml
+            postgres: 18
+            panel: false
+          - file: compose.portainer-panel.yml
+            postgres: 18
+            panel: true
+          - file: compose.portainer-panel.yml
+            postgres: 16
+            panel: true
+    env:
+      POSTGRES_VERSION: ${{ matrix.postgres }}
+      POSTGRES_PASSWORD: ci-only-project-server
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ci-only-admin-console
+      PANEL_ADMIN_PASSWORD: ci-only-panel-admin-password-for-tests
+      RESOLVE_LIBRARY: portainer_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Deploy from a single file
+        run: |
+          mkdir "$RUNNER_TEMP/portainer-test"
+          cp "${{ matrix.file }}" "$RUNNER_TEMP/portainer-test/compose.yml"
+          cd "$RUNNER_TEMP/portainer-test"
+          docker compose config --quiet
+          docker compose up -d --wait --wait-timeout 240
+      - name: Verify first library and its backup
+        working-directory: ${{ runner.temp }}/portainer-test
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3001/misc/ping
+          if [ "${{ matrix.panel }}" = true ]; then
+            curl --fail --silent --show-error http://127.0.0.1:3012/login >/dev/null
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3012/healthz)" = 503
+          fi
+          docker compose exec -T postgres createdb -U postgres "$RESOLVE_LIBRARY"
+          docker compose exec -T postgres psql -X -U postgres -d "$RESOLVE_LIBRARY" -v ON_ERROR_STOP=1 -c 'CREATE TABLE project_fixture (value integer); INSERT INTO project_fixture VALUES (42);'
+          docker compose exec -T pgbackups /backup.sh
+          docker compose exec -T pgbackups sh -ec 'archive=$(find /backups/last -type f -name "portainer_test-*.backup" | head -n 1); test -n "$archive"; pg_restore --list "$archive" | grep project_fixture'
+      - name: Check automatic panel setup and repeat it
+        if: matrix.panel
+        working-directory: ${{ runner.temp }}/portainer-test
+        run: |
+          curl --retry 30 --retry-delay 2 --fail --silent --show-error http://127.0.0.1:3012/healthz
+          test "$(docker compose exec -T postgres psql -XAtw -U postgres -d postgres -c 'SELECT name FROM resolve_access.available_libraries')" = "$RESOLVE_LIBRARY"
+          before=$(docker compose exec -T resolve-panel sha256sum /run/resolve-panel/session-key /run/resolve-panel/agent-password)
+          docker compose start panel-setup
+          test "$(docker wait "$(docker compose ps -aq panel-setup)")" = 0
+          after=$(docker compose exec -T resolve-panel sha256sum /run/resolve-panel/session-key /run/resolve-panel/agent-password)
+          test "$before" = "$after"
+          curl --fail --silent --show-error http://127.0.0.1:3012/healthz
+      - name: Print stack logs on failure
+        if: failure()
+        run: |
+          cd "$RUNNER_TEMP/portainer-test"
+          docker compose ps -a
+          docker compose logs --tail 80

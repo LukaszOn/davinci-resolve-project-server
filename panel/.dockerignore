@@ -2,4 +2,8 @@
 !app/
 !app/**
 !requirements.txt
+!bootstrap.sh
+!install-db.sh
+!sql/
+!sql/**
 **/__pycache__/

@@ -1,0 +1,17 @@
+FROM postgres:18
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /panel
+COPY requirements.txt .
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-venv \
+    && python3 -m venv /venv \
+    && /venv/bin/pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /var/lib/apt/lists/*
+COPY app/ .
+COPY bootstrap.sh install-db.sh ./
+COPY sql/ ./sql/
+
+USER 10001:10001
+EXPOSE 8080
+ENTRYPOINT ["sh", "/panel/bootstrap.sh", "serve"]

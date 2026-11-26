@@ -44,6 +44,7 @@ app.config.update(
 ADMIN_PASSWORD = secret_setting('PANEL_ADMIN_PASSWORD').encode()
 DB_PASSWORD = secret_setting('PANEL_DB_PASSWORD')
 PANEL_DISPLAY_NAME = os.environ.get('PANEL_DISPLAY_NAME', '').strip() or 'Project Library Desk'
+PANEL_MANAGED_LIBRARY = os.environ.get('PANEL_MANAGED_LIBRARY', '')
 if len(PANEL_DISPLAY_NAME) > 80:
     raise RuntimeError('PANEL_DISPLAY_NAME może mieć do 80 znaków.')
 DB_SSLMODE = os.environ.get('PANEL_DB_SSLMODE', 'prefer')
@@ -112,7 +113,12 @@ def protect_response(response):
 
 @app.context_processor
 def form_context():
-    return {'csrf': session.setdefault('csrf', secrets.token_urlsafe(32)), 'roles': ROLES, 'panel_display_name': PANEL_DISPLAY_NAME}
+    return {
+        'csrf': session.setdefault('csrf', secrets.token_urlsafe(32)),
+        'roles': ROLES,
+        'panel_display_name': PANEL_DISPLAY_NAME,
+        'panel_managed_library': PANEL_MANAGED_LIBRARY,
+    }
 
 
 @app.route('/login', methods=['GET', 'POST'])

@@ -2,6 +2,38 @@
 
 Uruchom na własnym komputerze lub NAS-ie bibliotekę projektów DaVinci Resolve, z której może korzystać kilka stacji montażowych. Docker uruchamia PostgreSQL, automatyczne kopie i pgAdmin. Panel WWW **DaVinci Project Manager** do zarządzania kontami i dostępem można dołączyć później.
 
+[Portainer](#instalacja-w-portainerze) · [Instalacja z pobranego katalogu](#pierwsze-uruchomienie) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
+
+## Instalacja w Portainerze
+
+Wybierz jeden kompletny plik dla środowiska **Docker Standalone**.
+
+| Wariant | Plik do wklejenia |
+| --- | --- |
+| PostgreSQL, kopie i pgAdmin | [Podstawowy Compose](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/compose.portainer.yml) |
+| PostgreSQL, kopie, pgAdmin i panel WWW | [Compose z panelem](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/compose.portainer-panel.yml) |
+
+1. W Portainerze wybierz **Stacks → Add stack → Web editor**, wpisz nazwę stacka i wklej zawartość wybranego pliku.
+2. W sekcji **Environment variables** wpisz ustawienia z tabeli.
+3. Kliknij **Deploy the stack**. Przy pierwszym uruchomieniu Docker pobierze obrazy. W wariancie z panelem zbuduje też jego obraz ze źródeł na GitHubie. [Instrukcja Portainera](https://docs.portainer.io/user/docker/stacks/add)
+
+| Zmienna | Co podać |
+| --- | --- |
+| `POSTGRES_PASSWORD` | Hasło do bazy, używane z loginem `postgres` w Resolve. |
+| `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | E-mail i osobne hasło do pgAdmin. |
+| `POSTGRES_BIND_IP` | Adres LAN lub VPN hosta Docker, np. `192.168.1.50`. Domyślne `127.0.0.1` oznacza dostęp z tego samego komputera. |
+| `RESOLVE_LIBRARY` | Nazwa, którą podasz w Resolve podczas tworzenia biblioteki. Domyślnie `studio`. |
+| `PANEL_ADMIN_PASSWORD` | Tylko w wariancie z panelem. Osobne hasło o długości co najmniej 32 znaków. |
+| `POSTGRES_VERSION` | Opcjonalnie `16`, `17` albo `18`. Domyślnie `18`. |
+
+W DaVinci Resolve wybierz **Network → Add Project Library → Create**, podaj adres hosta i nazwę z `RESOLVE_LIBRARY`. Serwer używa portu `5432`. pgAdmin otworzysz pod adresem hosta z portem `3001`.
+
+Jeśli wybrałeś wariant z panelem, otwórz adres hosta z portem `3012`. Zostaw pole loginu puste i podaj `PANEL_ADMIN_PASSWORD`. Gdy biblioteka pojawi się w PostgreSQL, osobna usługa `panel-setup` zarejestruje ją automatycznie i zakończy pracę. Panel dostaje adres bazy z Compose i łączy się przez własne konto techniczne. Kopie używają tej samej nazwy biblioteki, chyba że ustawisz osobno `BACKUP_DATABASES`.
+
+Dane i kopie domyślnie trafiają do woluminów Dockera. Jeśli chcesz zapisywać kopie w konkretnym katalogu na NAS-ie, ustaw `BACKUP_DIR` na jego pełną ścieżkę. Te pliki Compose są przeznaczone do nowej instalacji. Przy przenoszeniu istniejącej bazy użyj kopii i odtworzenia w nowym stacku.
+
+### Instalacja z pobranego katalogu
+
 | Plik | Do czego służy |
 | --- | --- |
 | [`docker-compose.yml`](docker-compose.yml) | Podstawowa instalacja z bazą, kopiami i pgAdmin. |
@@ -10,7 +42,7 @@ Uruchom na własnym komputerze lub NAS-ie bibliotekę projektów DaVinci Resolve
 
 [**Pobierz ZIP całego repozytorium**](https://github.com/LukaszOn/davinci-resolve-project-server/archive/refs/heads/main.zip) lub wybierz **Code → Download ZIP** nad listą plików na GitHubie. Rozpakuj cały katalog na komputerze z Dockerem. Compose korzysta także z plików w podkatalogach.
 
-[Instalacja](#pierwsze-uruchomienie) · [Panel WWW](#opcjonalny-panel-www) · [Ustawienia](#dodatkowe-ustawienia) · [Najczęstsze problemy](#najczęstsze-problemy)
+[Pierwsze uruchomienie](#pierwsze-uruchomienie) · [Ręczne dołączenie panelu WWW](#opcjonalny-panel-www)
 
 ## Pierwsze uruchomienie
 

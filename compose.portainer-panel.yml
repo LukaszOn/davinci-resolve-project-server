@@ -1,0 +1,175 @@
+# Portainer: Stacks > Add stack > Web editor (Docker Standalone).
+# Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
+# Dla panelu dodaj też PANEL_ADMIN_PASSWORD (co najmniej 32 znaki).
+# RESOLVE_LIBRARY to nazwa biblioteki, którą utworzysz w Resolve (domyślnie studio).
+# Dla dostępu z innego komputera podaj POSTGRES_BIND_IP (adres hosta Docker).
+x-postgres: &postgres-environment
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
+  TZ: ${TZ:-UTC}
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-18}
+    restart: unless-stopped
+    environment:
+      <<: *postgres-environment
+      POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/${POSTGRES_VERSION:-18}/docker
+    ports:
+      - target: 5432
+        published: "5432"
+        host_ip: ${POSTGRES_BIND_IP:-127.0.0.1}
+    volumes:
+      - "${POSTGRES_DATA_DIR:-pgdata}:/var/lib/postgresql"
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  pgbackups:
+    image: prodrigestivill/postgres-backup-local:${POSTGRES_VERSION:-18}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *postgres-environment
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${BACKUP_DATABASES:-${RESOLVE_LIBRARY:-studio}}
+      VALIDATE_ON_START: "FALSE"
+      SCHEDULE: ${BACKUP_SCHEDULE:-30 2 * * *}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+      POSTGRES_EXTRA_OPTS: --blobs --format=custom --quote-all-identifiers
+      BACKUP_SUFFIX: .backup
+    volumes:
+      - "${BACKUP_DIR:-backups}:/backups"
+    healthcheck:
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin-config:
+    image: python:3.13-slim
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - pgadmin-config:/config
+    entrypoint: ["python3", "-c"]
+    command:
+      - |
+        import json, os
+        from pathlib import Path
+        server = dict(Name="DaVinci Resolve", Group="Servers", Host="postgres",
+                      Port=5432, Username=os.environ["POSTGRES_USER"],
+                      MaintenanceDB="postgres", SSLMode="prefer")
+        target = Path("/config/servers.json")
+        temporary = target.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"Servers": {"1": server}}), encoding="utf-8")
+        temporary.chmod(0o644)
+        temporary.replace(target)
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgadmin-config:
+        condition: service_completed_successfully
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Ustaw PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Ustaw PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4-config/servers.json
+    ports:
+      - target: 80
+        published: "${PGADMIN_PORT:-3001}"
+        host_ip: ${PGADMIN_BIND_IP:-${POSTGRES_BIND_IP:-127.0.0.1}}
+    volumes:
+      - pgadmin-config:/pgadmin4-config:ro
+      - pgadmin:/var/lib/pgadmin
+      - "${BACKUP_DIR:-backups}:/backups:ro"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        account="$$(printf '%s' "$${PGADMIN_DEFAULT_EMAIL}" | tr '@' '_')"
+        storage="/var/lib/pgadmin/storage/$$account"
+        mkdir -p "$$storage"
+        if [ ! -e "$$storage/backups" ] && [ ! -L "$$storage/backups" ]; then
+          ln -s /backups "$$storage/backups"
+        fi
+        exec /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=4).close()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 8
+
+  panel-setup:
+    image: davinci-resolve-manager-web:portainer-0.1.0
+    build:
+      context: https://github.com/LukaszOn/davinci-resolve-project-server.git#portainer-0.1.0:panel
+      dockerfile: Dockerfile.portainer
+    pull_policy: build
+    user: "0:0"
+    entrypoint: ["sh", "/panel/bootstrap.sh", "configure"]
+    restart: "on-failure:3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Ustaw POSTGRES_PASSWORD}
+      RESOLVE_LIBRARY: ${RESOLVE_LIBRARY:-studio}
+    volumes:
+      - "${POSTGRES_DATA_DIR:-pgdata}:/var/lib/postgresql"
+      - panel-secrets:/run/resolve-panel
+    security_opt:
+      - no-new-privileges:true
+
+  resolve-panel:
+    image: davinci-resolve-manager-web:portainer-0.1.0
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      panel-setup:
+        condition: service_started
+    environment:
+      PANEL_DISPLAY_NAME: DaVinci Project Manager
+      PANEL_DB_HOST: postgres
+      PANEL_DB_NAME: postgres
+      PANEL_MANAGED_LIBRARY: ${RESOLVE_LIBRARY:-studio}
+      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Ustaw PANEL_ADMIN_PASSWORD (co najmniej 32 znaki)}
+      PANEL_DB_PASSWORD_FILE: /run/resolve-panel/agent-password
+      PANEL_SESSION_KEY_FILE: /run/resolve-panel/session-key
+      PANEL_SECURE_COOKIE: ${PANEL_SECURE_COOKIE:-0}
+    ports:
+      - target: 8080
+        published: "${PANEL_PORT:-3012}"
+        host_ip: ${PANEL_BIND_IP:-${POSTGRES_BIND_IP:-127.0.0.1}}
+    volumes:
+      - panel-secrets:/run/resolve-panel:ro
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/login', timeout=4).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  panel-secrets:
+  pgdata:
+  backups:
+  pgadmin-config:
+  pgadmin:
