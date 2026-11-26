@@ -52,7 +52,7 @@ jobs:
             -v "$RUNNER_TEMP/portainer-admin:/run/admin-password:ro" \
             portainer/portainer-ce:lts --admin-password-file /run/admin-password
           api=https://127.0.0.1:19443/api
-          curl -kfsS --retry 20 --retry-delay 2 --retry-connrefused https://127.0.0.1:19443/ >/dev/null
+          curl -kfsS --retry 20 --retry-delay 2 --retry-all-errors https://127.0.0.1:19443/ >/dev/null
           token=$(jq -n --rawfile password "$RUNNER_TEMP/portainer-admin" '{Username:"admin",Password:($password|rtrimstr("\n"))}' |
             curl -kfsS -H 'Content-Type: application/json' --data-binary @- "$api/auth" |
             jq -er .jwt)
