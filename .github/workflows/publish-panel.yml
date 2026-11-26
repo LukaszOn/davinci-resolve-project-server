@@ -1,0 +1,87 @@
+name: Publish web panel image
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Server release tag to publish, for example v0.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency: publish-web-panel
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: ghcr.io/lukaszon/davinci-project-manager-web
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Check the release tag
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'IMAGE_VERSION=%s\n' "${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/${{ inputs.release_tag }}
+          persist-credentials: false
+      - name: Build the Unraid image
+        run: |
+          docker build --pull \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+            --label "org.opencontainers.image.version=$IMAGE_VERSION" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --tag "$IMAGE:$IMAGE_VERSION" panel
+      - name: Start the panel with an isolated PostgreSQL instance
+        run: |
+          docker network create dpm-test
+          docker run -d --name dpm-postgres --network dpm-test \
+            -e "POSTGRES_PASSWORD=$(openssl rand -hex 32)" postgres:16
+          for attempt in {1..30}; do
+            if docker exec dpm-postgres pg_isready -h 127.0.0.1 -q; then break; fi
+            sleep 2
+          done
+          docker exec dpm-postgres createdb -U postgres unraid_fixture
+          PANEL_POSTGRES_CONTAINER=dpm-postgres PANEL_ENV_FILE="$RUNNER_TEMP/panel.env" \
+            sh panel/install-db.sh unraid_fixture
+          docker run -d --name dpm-panel --network dpm-test --read-only --tmpfs /tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --env-file "$RUNNER_TEMP/panel.env" -e PANEL_DB_HOST=dpm-postgres \
+            -p 127.0.0.1:3012:8080 "$IMAGE:$IMAGE_VERSION"
+      - name: Verify the panel in both languages
+        run: |
+          base=http://127.0.0.1:3012
+          curl --fail --silent --show-error --retry 15 --retry-delay 2 --retry-all-errors "$base/healthz"
+          curl --fail --silent --show-error --cookie-jar "$RUNNER_TEMP/cookies" "$base/login" > "$RUNNER_TEMP/login.html"
+          grep -q 'Sign in to the panel' "$RUNNER_TEMP/login.html"
+          csrf=$(sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' "$RUNNER_TEMP/login.html" | head -n 1)
+          test -n "$csrf"
+          password=$(sed -n 's/^PANEL_ADMIN_PASSWORD=//p' "$RUNNER_TEMP/panel.env")
+          curl --fail --silent --show-error --location --cookie "$RUNNER_TEMP/cookies" \
+            --cookie-jar "$RUNNER_TEMP/cookies" --data-urlencode "csrf=$csrf" \
+            --data-urlencode "password=$password" "$base/login" > "$RUNNER_TEMP/index.html"
+          grep -q 'Project access' "$RUNNER_TEMP/index.html"
+          grep -q 'unraid_fixture' "$RUNNER_TEMP/index.html"
+          csrf=$(sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' "$RUNNER_TEMP/index.html" | head -n 1)
+          curl --fail --silent --show-error --location --cookie "$RUNNER_TEMP/cookies" \
+            --data-urlencode "csrf=$csrf" --data-urlencode language=pl "$base/language" > "$RUNNER_TEMP/index-pl.html"
+          grep -q '<html lang="pl">' "$RUNNER_TEMP/index-pl.html"
+      - name: Publish the tested image to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$IMAGE_VERSION"
+          docker tag "$IMAGE:$IMAGE_VERSION" "$IMAGE:latest"
+          docker push "$IMAGE:latest"
+      - name: Print test container logs on failure
+        if: failure()
+        run: |
+          docker ps -a
+          docker logs --tail 50 dpm-panel 2>&1 || true

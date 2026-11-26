@@ -78,7 +78,7 @@ def hba(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Konfiguracja Project Library Desk dla Docker Compose.')
+    parser = argparse.ArgumentParser(description='Configure the DaVinci Project Manager web panel.')
     actions = parser.add_subparsers(required=True)
     init = actions.add_parser('init', help='Create a new .env file with generated passwords.')
     init.add_argument('--db-host', required=True)

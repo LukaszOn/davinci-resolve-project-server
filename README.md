@@ -155,6 +155,24 @@ Open the panel on port `3012`. To change the address or port, update `PANEL_BIND
 
 </details>
 
+## Unraid Community Apps
+
+The Unraid template installs the web panel and connects it to your existing PostgreSQL server. Prepare the access module and register a library before opening the panel.
+
+If your PostgreSQL server is a local Docker container and you are setting up the module for the first time, run the following from the repository directory. Replace the example container and library names.
+
+```sh
+PANEL_POSTGRES_CONTAINER=your-postgres \
+  PANEL_ENV_FILE="$PWD/panel/.env" \
+  sh panel/install-db.sh studio_test
+```
+
+The setup saves the credentials in `panel/.env`. If your server already has a working panel or access module, use its existing settings.
+
+Choose **DaVinci Project Manager** in **Apps** and select **Install**. Set **PostgreSQL host** to an address reachable from the container. Copy `PANEL_DB_PASSWORD`, `PANEL_ADMIN_PASSWORD`, and `PANEL_SESSION_KEY` from the module setup. After installation, open **WebUI**, leave the username blank, and enter the panel administrator password. Keep the same PostgreSQL settings and session key when you update the image.
+
+For manual testing before the listing is available, save the [template XML](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.xml) in `/boot/config/plugins/dockerMan/templates-user/`. Select it under **Docker → Add Container**.
+
 ## Settings
 
 | Variable | Default and purpose |
@@ -185,4 +203,4 @@ Check service status with `docker compose ps -a`. Use `docker compose logs --tai
 
 ## Upstream project
 
-This project is an independent fork of [Elliot Matson’s Docker-Davinci-Resolve-Project-Server](https://github.com/elliotmatson/Docker-Davinci-Resolve-Project-Server) under the [MIT license](LICENSE.md).
+This project is an independent fork of [Elliot Matson’s Docker-Davinci-Resolve-Project-Server](https://github.com/elliotmatson/Docker-Davinci-Resolve-Project-Server) under the [MIT license](LICENSE).

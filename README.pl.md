@@ -163,6 +163,24 @@ Otwórz adres panelu z tabeli powyżej. Aby ustawić jego adres lub port, zmień
 
 </details>
 
+## Unraid Community Apps
+
+Szablon Unraid instaluje panel WWW i łączy go z istniejącym serwerem PostgreSQL. Przed otwarciem panelu przygotuj moduł dostępu i zarejestruj bibliotekę.
+
+Jeśli PostgreSQL działa w lokalnym kontenerze i konfigurujesz moduł po raz pierwszy, uruchom poniższe polecenie w katalogu repozytorium. Podstaw nazwę kontenera serwera i nazwę biblioteki.
+
+```sh
+PANEL_POSTGRES_CONTAINER=your-postgres \
+  PANEL_ENV_FILE="$PWD/panel/.env" \
+  sh panel/install-db.sh studio_test
+```
+
+Instalator zapisze dane dostępowe w `panel/.env`. Jeśli masz już działający panel lub moduł dostępu, użyj zapisanej konfiguracji.
+
+W **Apps** wyszukaj **DaVinci Project Manager** i wybierz **Install**. W polu **PostgreSQL host** wpisz adres dostępny z kontenera. Przepisz `PANEL_DB_PASSWORD`, `PANEL_ADMIN_PASSWORD` i `PANEL_SESSION_KEY` z konfiguracji modułu. Po instalacji otwórz **WebUI**, zostaw pustą nazwę użytkownika i wpisz hasło administratora panelu. Przy aktualizacji obrazu zachowaj ustawienia PostgreSQL i klucz sesji.
+
+Przed udostępnieniem aplikacji w katalogu możesz zapisać [szablon XML](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.xml) w `/boot/config/plugins/dockerMan/templates-user/` i wybrać go w **Docker → Add Container**.
+
 ## Dodatkowe ustawienia
 
 | Zmienna | Domyślna wartość i zastosowanie |
@@ -193,4 +211,4 @@ Stan usług sprawdzisz poleceniem `docker compose ps -a`, a komunikaty bazy i ko
 
 ## Projekt źródłowy
 
-Fork [Docker-Davinci-Resolve-Project-Server autorstwa Elliota Matsona](https://github.com/elliotmatson/Docker-Davinci-Resolve-Project-Server). Kod jest udostępniony na licencji [MIT](LICENSE.md). Projekt jest niezależny od Blackmagic Design.
+Fork [Docker-Davinci-Resolve-Project-Server autorstwa Elliota Matsona](https://github.com/elliotmatson/Docker-Davinci-Resolve-Project-Server). Kod jest udostępniony na licencji [MIT](LICENSE). Projekt jest niezależny od Blackmagic Design.

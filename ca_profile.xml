@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommunityApplications>
+  <Profile>Tools for self-hosted DaVinci Resolve project libraries and team access.</Profile>
+  <Icon>https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.png</Icon>
+  <WebPage>https://github.com/LukaszOn/davinci-resolve-project-server</WebPage>
+  <Forum>https://github.com/LukaszOn/davinci-resolve-project-server/issues</Forum>
+</CommunityApplications>
