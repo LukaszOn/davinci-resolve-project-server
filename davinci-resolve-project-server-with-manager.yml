@@ -131,9 +131,9 @@ services:
       retries: 8
 
   panel-setup:
-    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.1}
+    image: ${PANEL_IMAGE:-davinci-project-manager-deployment:a27957e0}
     build:
-      context: ${PANEL_BUILD_CONTEXT:-https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.4.1:panel}
+      context: ${PANEL_BUILD_CONTEXT:-https://github.com/LukaszOn/davinci-resolve-project-server.git#a27957e03d893afb08e8be5ab54a98706051c01d:panel}
       dockerfile: Dockerfile.deployment
     pull_policy: build
     user: "0:0"
@@ -146,6 +146,7 @@ services:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER:-postgres}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      PANEL_DB_USER: ${PANEL_DB_USER:-}
       RESOLVE_LIBRARY: ${RESOLVE_LIBRARY:-studio}
     volumes:
       - "${POSTGRES_DATA_DIR:-pgdata}:/var/lib/postgresql"
@@ -154,7 +155,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.1}
+    image: ${PANEL_IMAGE:-davinci-project-manager-deployment:a27957e0}
     pull_policy: never
     restart: unless-stopped
     depends_on:
@@ -164,6 +165,7 @@ services:
       PANEL_DISPLAY_NAME: DaVinci Project Manager
       PANEL_DB_HOST: postgres
       PANEL_DB_NAME: postgres
+      PANEL_DB_USER: ${PANEL_DB_USER:-}
       PANEL_MANAGED_LIBRARY: ${RESOLVE_LIBRARY:-studio}
       PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Set PANEL_ADMIN_PASSWORD (at least 8 characters)}
       PANEL_DB_PASSWORD_FILE: /run/resolve-panel/agent-password

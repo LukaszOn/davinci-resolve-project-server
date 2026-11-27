@@ -22,12 +22,15 @@ jobs:
           - file: davinci-resolve-project-server-with-manager.yml
             postgres: 16
             panel: true
+            db_user: studio_panel
     env:
       POSTGRES_VERSION: ${{ matrix.postgres }}
       POSTGRES_PASSWORD: ci-only-project-server
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: ci-only-admin-console
       PANEL_ADMIN_PASSWORD: ci-only-panel-admin-password-for-tests
+      PANEL_DB_USER: ${{ matrix.db_user }}
+      PANEL_BUILD_CONTEXT: ${{ github.workspace }}/panel
       RESOLVE_LIBRARY: deployment_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -61,6 +64,7 @@ jobs:
         run: |
           curl --retry 30 --retry-delay 2 --fail --silent --show-error http://127.0.0.1:3012/healthz
           test "$(docker compose exec -T postgres psql -XAtw -U postgres -d postgres -c 'SELECT name FROM resolve_access.available_libraries')" = "$RESOLVE_LIBRARY"
+          test "$(docker compose exec -T postgres psql -XAtw -U postgres -d postgres -c 'SELECT username FROM resolve_access.panel_service_account')" = "${PANEL_DB_USER:-resolve_panel_agent}"
           before=$(docker compose exec -T resolve-panel sha256sum /run/resolve-panel/session-key /run/resolve-panel/agent-password)
           docker compose start panel-setup
           test "$(docker wait "$(docker compose ps -aq panel-setup)")" = 0
@@ -81,6 +85,24 @@ jobs:
             --data-urlencode "csrf=$csrf" --data-urlencode language=pl "$base/language" > login-pl.html
           grep -q '<html lang="pl">' login-pl.html
           grep -q 'Zaloguj się do panelu' login-pl.html
+      - name: Rename the configured panel account
+        if: matrix.panel
+        working-directory: ${{ runner.temp }}/deployment-test
+        run: |
+          role_oid() {
+            docker compose exec -T postgres psql -XAtqw -v ON_ERROR_STOP=1 -U postgres -d postgres -v role="$1" <<'SQL'
+          SELECT oid FROM pg_roles WHERE rolname = :'role';
+          SQL
+          }
+          old_user=${PANEL_DB_USER:-resolve_panel_agent}
+          before=$(role_oid "$old_user")
+          test -n "$before"
+          export PANEL_DB_USER=renamed_panel
+          docker compose up -d panel-setup resolve-panel
+          test "$(docker wait "$(docker compose ps -aq panel-setup)")" = 0
+          test "$(role_oid "$PANEL_DB_USER")" = "$before"
+          test -z "$(role_oid "$old_user")"
+          curl --retry 30 --retry-delay 2 --retry-all-errors --fail --silent --show-error http://127.0.0.1:3012/healthz
       - name: Print stack logs on failure
         if: failure()
         run: |

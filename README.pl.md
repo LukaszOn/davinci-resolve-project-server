@@ -28,6 +28,7 @@ Z terminala zapisz wybrany plik jako `compose.yml`, wpisz ustawienia do pliku `.
 | `POSTGRES_BIND_IP` | Adres LAN lub VPN hosta Docker, np. `192.168.1.50`. Domyślne `127.0.0.1` oznacza dostęp z tego samego komputera. |
 | `RESOLVE_LIBRARY` | Nazwa, którą podasz w Resolve podczas tworzenia biblioteki. Domyślnie `studio`. |
 | `PANEL_ADMIN_PASSWORD` | Hasło konta `admin` w panelu WWW. Ustaw osobne hasło o długości co najmniej 8 znaków. |
+| `PANEL_DB_USER` | Login panelu WWW do PostgreSQL. Domyślnie `resolve_panel_agent`. |
 | `POSTGRES_VERSION` | Opcjonalnie `16`, `17` albo `18`. Domyślnie `18`. |
 
 W DaVinci Resolve wybierz **Network → Add Project Library → Create**, podaj adres hosta i nazwę z `RESOLVE_LIBRARY`. Harmonogram kopii domyślnie korzysta z tej nazwy. Jeśli chcesz kopiować inną bibliotekę lub kilka bibliotek, ustaw `BACKUP_DATABASES`.
@@ -189,7 +190,7 @@ PANEL_ENV_FILE=.env \
 docker compose -f docker-compose.yml -f compose.panel.yml up -d --build
 ```
 
-Pierwsze polecenie tworzy oddzielny `panel/.env` z hasłem do panelu. Zachowaj ten plik przy aktualizacji. Aby dodać kolejną bibliotekę, wykonaj ponownie krok z `install-db.sh`, podając jej nazwę. Instalator używa `psql` z kontenera i ustawia w PostgreSQL reguły dostępu dla kont panelu.
+Dane logowania panelu znajdziesz w `panel/.env`. Kolejną bibliotekę dodasz przez `install-db.sh`, podając jej nazwę.
 
 Otwórz adres panelu z tabeli powyżej. Aby ustawić jego adres lub port, zmień `PANEL_BIND_IP` lub `PANEL_PORT` w głównym `.env` i zastosuj zmianę przez polecenie z oboma plikami Compose. Jeśli panel działa za proxy HTTPS, ustaw `PANEL_SECURE_COOKIE=1` w `panel/.env`.
 
@@ -204,9 +205,9 @@ W pełnej kopii repozytorium dodaj `PANEL_BUILD_CONTEXT=./panel` i `PANEL_IMAGE=
 
 ## Unraid Community Apps
 
-Szablon Unraid instaluje panel WWW. Panel potrzebuje działającego PostgreSQL z modułem dostępu i co najmniej jedną zarejestrowaną biblioteką Resolve. Jeśli masz już moduł, skorzystaj z jego konfiguracji.
+Panel WWW łączy się z PostgreSQL i korzysta z modułu dostępu do bibliotek Resolve.
 
-Jeśli PostgreSQL działa w lokalnym kontenerze i konfigurujesz moduł po raz pierwszy, uruchom poniższe polecenie w katalogu repozytorium. Podstaw nazwę kontenera serwera i nazwę biblioteki.
+Aby zainstalować moduł w kontenerze PostgreSQL, uruchom polecenie z katalogu repozytorium. Podstaw nazwę kontenera i nazwę biblioteki.
 
 ```sh
 PANEL_POSTGRES_CONTAINER=your-postgres \
@@ -214,19 +215,17 @@ PANEL_POSTGRES_CONTAINER=your-postgres \
   sh panel/install-db.sh editing_projects
 ```
 
-Instalator zapisze dane panelu w `panel/.env`. Jeśli administrujesz PostgreSQL z konta o nazwie innej niż `postgres`, do polecenia dodaj `PANEL_POSTGRES_ADMIN` z nazwą tego konta.
+Instalator zapisuje dane połączenia w `panel/.env`. Nazwę konta panelu możesz podać w `PANEL_DB_USER`, a login administratora PostgreSQL w `PANEL_POSTGRES_ADMIN`.
 
 Jeśli widzisz **DaVinci Project Manager** w **Apps**, wybierz **Install**. Aby zainstalować go ręcznie, otwórz [szablon XML](templates/davinci-project-manager.xml) na GitHubie. Kliknij **Download raw file**, zapisz plik w `/boot/config/plugins/dockerMan/templates-user/` i wybierz go w **Docker → Add Container**.
 
-W polu **PostgreSQL host** wpisz adres dostępny z kontenera panelu. Domyślne ustawienia to port PostgreSQL `5432`, baza rejestru kont `postgres` i port WebUI `3012`. W polu **PostgreSQL service password** wpisz `PANEL_DB_PASSWORD` z pliku `panel/.env` lub z konfiguracji działającego panelu.
+W szablonie Unraid wpisz adres serwera w **PostgreSQL host**. Do pól **PostgreSQL service account** i **PostgreSQL service password** przepisz `PANEL_DB_USER` i `PANEL_DB_PASSWORD` z `panel/.env`.
 
-W polu **Panel administrator password** ustaw hasło dla konta `admin` (co najmniej 8 znaków). Otwórz **WebUI** i zaloguj się na to konto. Po restarcie kontenera zaloguj się ponownie tym samym hasłem.
+W **Panel administrator password** ustaw hasło do panelu WWW (co najmniej 8 znaków). Otwórz **WebUI** i zaloguj się jako `admin`.
 
 ### Dostęp do plików kopii na Unraidzie
 
-W polu **Backup folder** wybierz katalog na Unraidzie. Domyślna ścieżka to `/mnt/user/backups/davinci-resolve`. Unraid mapuje ten katalog w kontenerze panelu jako `/backups` z dostępem tylko do odczytu.
-
-Jeśli kopie wykonuje `pgbackups` ze stacka Compose Project Servera, ustaw katalog kopii przez `BACKUP_DIR` w Compose. W polu **Backup folder** możesz wskazać tę samą ścieżkę.
+Katalog na kopie biblioteki ustaw w `BACKUP_DIR` w stacku Project Servera.
 
 Pliki `.backup` znajdziesz w podkatalogu `last/` wybranego katalogu. Jeśli udział `backups` jest dostępny przez SMB, w Windows otwórz np. `\\UNRAID\backups\davinci-resolve\last`. Do odtworzenia skopiuj archiwum z datą w nazwie.
 

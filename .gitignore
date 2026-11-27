@@ -1,4 +1,6 @@
 .env
+panel.env
+panel.env.*
 .env.*
 !.env.example
 data/
