@@ -5,6 +5,8 @@ WORKDIR /panel
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ .
+COPY start.sh .
 USER 10001:10001
 EXPOSE 8080
+ENTRYPOINT ["sh", "/panel/start.sh"]
 CMD ["gunicorn", "--bind=0.0.0.0:8080", "--workers=1", "--threads=4", "--worker-tmp-dir=/tmp", "--no-control-socket", "app:app"]

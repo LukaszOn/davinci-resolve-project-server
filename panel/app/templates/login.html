@@ -5,7 +5,7 @@
   <div class="single-card">
     <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>{{ panel_display_name }}</strong><small>{{ tr('DaVinci Resolve libraries') }}</small></span></div>
     <h1>{{ tr('Sign in to the panel') }}</h1>
-    <p>{{ tr('Use your administrator credentials. Leave the username blank to use the main panel password.') }}</p>
+    <p>{{ tr('Use admin with the password set during installation, or sign in with your own administrator account.') }}</p>
     {% if error %}<div class="notice error" role="alert">{{ tr(error) }}</div>{% endif %}
     <form method="post" class="single-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">

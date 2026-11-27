@@ -17,7 +17,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from translations import LEGACY_SQL_MESSAGES, POLISH
 
 
-def secret_setting(name):
+def secret_setting(name, minimum_length=32):
     value = os.environ.get(name, '')
     path = os.environ.get(name + '_FILE', '')
     if value and path:
@@ -27,8 +27,8 @@ def secret_setting(name):
             value = Path(path).read_text(encoding='utf-8').rstrip('\r\n')
         except (OSError, UnicodeError) as error:
             raise RuntimeError(f'Could not read the {name}_FILE secret.') from error
-    if len(value) < 32:
-        raise RuntimeError(f'{name} must be at least 32 characters long.')
+    if len(value) < minimum_length:
+        raise RuntimeError(f'{name} must be at least {minimum_length} characters long.')
     return value
 
 
@@ -43,7 +43,7 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     MAX_CONTENT_LENGTH=144 * 1024,
 )
-ADMIN_PASSWORD = secret_setting('PANEL_ADMIN_PASSWORD').encode()
+ADMIN_PASSWORD = secret_setting('PANEL_ADMIN_PASSWORD', minimum_length=8).encode()
 DB_PASSWORD = secret_setting('PANEL_DB_PASSWORD')
 PANEL_DISPLAY_NAME = os.environ.get('PANEL_DISPLAY_NAME', '').strip() or 'DaVinci Project Manager'
 PANEL_MANAGED_LIBRARY = os.environ.get('PANEL_MANAGED_LIBRARY', '')
@@ -169,15 +169,14 @@ def login():
             username = request.form.get('username', '').strip().lower()
             password = request.form.get('password', '')
             member = None
-            if LOGIN_NAME.fullmatch(username) and len(password) <= 128:
+            authenticated = username in ('admin', '') and hmac.compare_digest(ADMIN_PASSWORD, password.encode())
+            if not authenticated and LOGIN_NAME.fullmatch(username) and len(password) <= 128:
                 try:
                     member = panel_administrator(username)
                 except psycopg.Error:
                     return render_template('unavailable.html'), 503
                 web_hash = member['panel_hash'] if member else LOGIN_DUMMY_HASH
                 authenticated = check_password_hash(web_hash, password) and member is not None
-            else:
-                authenticated = not username and hmac.compare_digest(ADMIN_PASSWORD, password.encode())
             if authenticated:
                 FAILED_LOGINS.clear()
                 session.clear()

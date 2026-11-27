@@ -2,6 +2,7 @@
 !app/
 !app/**
 !requirements.txt
+!start.sh
 !bootstrap.sh
 !install-db.sh
 !sql/

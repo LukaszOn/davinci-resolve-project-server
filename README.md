@@ -27,7 +27,7 @@ From a terminal, save the Compose file as `compose.yml`, put the settings in the
 | `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | Email and a separate password for pgAdmin. |
 | `POSTGRES_BIND_IP` | LAN or VPN address of the Docker host, for example `192.168.1.50`. The default `127.0.0.1` gives access from the same computer. |
 | `RESOLVE_LIBRARY` | The library name you will enter in Resolve. The default is `studio`. |
-| `PANEL_ADMIN_PASSWORD` | Only for the panel variant. Use a separate password of at least 32 characters. |
+| `PANEL_ADMIN_PASSWORD` | Password for the web panel’s `admin` account. Use a separate password of at least 8 characters. |
 | `POSTGRES_VERSION` | Optional. Use `16`, `17`, or `18`. The default is `18`. |
 
 In DaVinci Resolve, choose **Network → Add Project Library → Create**, enter the Docker host address, and use the name set in `RESOLVE_LIBRARY`. Scheduled backups use that name by default. Set `BACKUP_DATABASES` to back up a different library or a list of libraries.
@@ -44,7 +44,7 @@ The DaVinci Project Manager web panel runs on your Docker server. From a browser
 
 1. Choose the [Compose file with the web panel](davinci-resolve-project-server-with-manager.yml) and set `PANEL_ADMIN_PASSWORD`. The panel reads its database connection settings from Compose. Python is included in the container.
 2. In Resolve, create the library named in `RESOLVE_LIBRARY`. The `panel-setup` container registers it with the panel.
-3. With the default settings, open the [local panel](http://127.0.0.1:3012) on the Docker host. If you set `POSTGRES_BIND_IP` to your NAS address, use that address in your browser, for example `http://192.168.1.50:3012`. At first sign-in, leave the username blank and enter the password you set in `PANEL_ADMIN_PASSWORD`.
+3. With the default settings, open the [local panel](http://127.0.0.1:3012) on the Docker host. If you set `POSTGRES_BIND_IP` to your NAS address, use that address in your browser, for example `http://192.168.1.50:3012`. Sign in as `admin` with the password you set in `PANEL_ADMIN_PASSWORD`.
 
 The panel opens in English. You can choose Polish on the sign-in page or later in the sidebar.
 
@@ -161,7 +161,7 @@ pg_verifybackup studio-cluster
 | --- | --- | --- |
 | DaVinci Resolve | **Network** libraries on PostgreSQL port **5432**. | PostgreSQL username and password. |
 | pgAdmin | [http://127.0.0.1:3001](http://127.0.0.1:3001) on the Docker host. | `PGADMIN_DEFAULT_*` from `.env`. |
-| DaVinci Project Manager web panel | [http://127.0.0.1:3012](http://127.0.0.1:3012) after adding the panel. | Leave the username blank and enter `PANEL_ADMIN_PASSWORD`. For a single-file install, use the password from the stack settings. For a manual ZIP install, use the one in `panel/.env`. |
+| DaVinci Project Manager web panel | [http://127.0.0.1:3012](http://127.0.0.1:3012) after adding the panel. | The username is `admin`. For a single-file install, use `PANEL_ADMIN_PASSWORD` from the stack settings. For a ZIP install, use the password in `panel/.env`. |
 
 To open pgAdmin from another computer on a trusted LAN, set `PGADMIN_BIND_IP` to the Docker host's LAN address. Run `docker compose up -d pgadmin` and open that address on port `3001`. Enter the PostgreSQL password when opening the **DaVinci Resolve** connection in pgAdmin.
 
@@ -214,15 +214,23 @@ The setup saves panel credentials in `panel/.env`. If your PostgreSQL administra
 
 If **DaVinci Project Manager** is listed in **Apps**, select **Install**. To install it manually, open the [Unraid XML template](templates/davinci-project-manager.xml) on GitHub. Choose **Download raw file**, save it in `/boot/config/plugins/dockerMan/templates-user/`, and select it under **Docker → Add Container**.
 
-Set **PostgreSQL host** to an address reachable from the panel container. Copy these settings from `panel/.env` or from your existing panel configuration.
+Set **PostgreSQL host** to an address the panel container can reach. The defaults are `5432` for the PostgreSQL port, `postgres` for the account registry database, and `3012` for the WebUI port. In **PostgreSQL service password**, enter `PANEL_DB_PASSWORD` from `panel/.env` or from your existing panel configuration.
 
-| Field in Unraid | Setting to copy |
-| --- | --- |
-| **PostgreSQL service password** | `PANEL_DB_PASSWORD` |
-| **Panel administrator password** | `PANEL_ADMIN_PASSWORD` |
-| **Session signing key** | `PANEL_SESSION_KEY` |
+In **Panel administrator password**, set a password of at least 8 characters for the `admin` account. Open **WebUI** and sign in as `admin`. After a container restart, sign in again with the same password.
 
-Open **WebUI**, leave the username blank, and enter the panel administrator password. Keep the same PostgreSQL settings and session key when you update the image.
+### Access backup files on Unraid
+
+Choose an Unraid directory in **Backup folder**. The default is `/mnt/user/backups/davinci-resolve`. Unraid mounts that directory at `/backups` in the panel container with read-only access.
+
+If `pgbackups` in the Project Server Compose stack runs your backups, set the backup directory through `BACKUP_DIR` in Compose. You can select that same directory in **Backup folder**.
+
+You'll find `.backup` files in the `last/` subdirectory of your chosen folder. If you share `backups` over SMB, you can open it from Windows, for example at `\\UNRAID\backups\davinci-resolve\last`. Copy a dated archive for the library you want to restore.
+
+Sign in to the destination PostgreSQL server as an administrator and create an empty database with the name you want. If you use pgAdmin in a browser, upload the file to **My Storage** through **Tools → Storage Manager**. Right-click the new database, choose **Restore**, set the format to **Custom or tar**, and select the `.backup` file. Under **Query Options**, leave **Include CREATE DATABASE statement** off to restore into the selected database. [Restore in pgAdmin](https://www.pgadmin.org/docs/pgadmin4/latest/restore_dialog.html)
+
+If the destination server is missing roles from the source, turn on **Owner** and **Privileges** under **Data Options → Do not save** to skip ownership and permissions. To manage access to the restored library from the web panel, register it on the destination server.
+
+For a new PostgreSQL installation, you can set the data directory in the same stack, for example `POSTGRES_DATA_DIR=/mnt/user/appdata/davinci-resolve/postgres`.
 
 ## Settings
 

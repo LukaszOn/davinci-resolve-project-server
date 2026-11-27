@@ -119,7 +119,7 @@ POLISH = {
     'Unlock account': 'Odblokuj konto',
     'Use 8–128 characters. Leave both fields blank to generate a password.': 'Od 8 do 128 znaków. Zostaw oba pola puste, aby wygenerować hasło.',
     'Use a username of 2–31 characters. Start with a letter and use a–z, digits, or underscores.': 'Login musi mieć od 2 do 31 znaków. Zacznij literą i używaj a–z, cyfr oraz podkreśleń.',
-    'Use your administrator credentials. Leave the username blank to use the main panel password.': 'Użyj danych administratora. Dla głównego hasła panelu zostaw login pusty.',
+    'Use admin with the password set during installation, or sign in with your own administrator account.': 'Zaloguj się jako admin, używając hasła ustawionego podczas instalacji, lub skorzystaj z własnego konta administratora.',
     'Users': 'Użytkownicy',
     'Wait one minute before trying again.': 'Odczekaj minutę przed następną próbą.',
     'e.g. Alex Smith': 'np. Anna Kowalska',

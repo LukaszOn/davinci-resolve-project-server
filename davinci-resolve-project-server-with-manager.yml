@@ -1,6 +1,6 @@
 # Paste this file into your stack editor or save it as compose.yml.
 # Dodaj POSTGRES_PASSWORD, PGADMIN_DEFAULT_EMAIL i PGADMIN_DEFAULT_PASSWORD.
-# For the web panel, also set PANEL_ADMIN_PASSWORD (at least 32 characters).
+# For the web panel, set PANEL_ADMIN_PASSWORD for the admin login (at least 8 characters).
 # RESOLVE_LIBRARY is the library name you will create in Resolve (default: studio).
 # For access from another computer, set POSTGRES_BIND_IP to the Docker host address.
 x-postgres: &postgres-environment
@@ -131,9 +131,9 @@ services:
       retries: 8
 
   panel-setup:
-    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.0}
+    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.1}
     build:
-      context: ${PANEL_BUILD_CONTEXT:-https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.4.0:panel}
+      context: ${PANEL_BUILD_CONTEXT:-https://github.com/LukaszOn/davinci-resolve-project-server.git#v0.4.1:panel}
       dockerfile: Dockerfile.deployment
     pull_policy: build
     user: "0:0"
@@ -154,7 +154,7 @@ services:
       - no-new-privileges:true
 
   resolve-panel:
-    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.0}
+    image: ${PANEL_IMAGE:-davinci-project-manager-web:0.4.1}
     pull_policy: never
     restart: unless-stopped
     depends_on:
@@ -165,7 +165,7 @@ services:
       PANEL_DB_HOST: postgres
       PANEL_DB_NAME: postgres
       PANEL_MANAGED_LIBRARY: ${RESOLVE_LIBRARY:-studio}
-      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Set PANEL_ADMIN_PASSWORD (at least 32 characters)}
+      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?Set PANEL_ADMIN_PASSWORD (at least 8 characters)}
       PANEL_DB_PASSWORD_FILE: /run/resolve-panel/agent-password
       PANEL_SESSION_KEY_FILE: /run/resolve-panel/session-key
       PANEL_SECURE_COOKIE: ${PANEL_SECURE_COOKIE:-0}

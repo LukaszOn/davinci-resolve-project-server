@@ -21,6 +21,7 @@ jobs:
     env:
       IMAGE: ghcr.io/lukaszon/davinci-project-manager-web
       RELEASE_TAG: ${{ inputs.release_tag }}
+      PANEL_ADMIN_PASSWORD: ci-panel
     steps:
       - name: Check the release tag
         run: |
@@ -50,10 +51,11 @@ jobs:
           docker exec dpm-postgres createdb -U postgres unraid_fixture
           PANEL_POSTGRES_CONTAINER=dpm-postgres PANEL_ENV_FILE="$RUNNER_TEMP/panel.env" \
             sh panel/install-db.sh unraid_fixture
+          sed -i '/^PANEL_SESSION_KEY=/d; /^PANEL_ADMIN_PASSWORD=/d' "$RUNNER_TEMP/panel.env"
           docker run -d --name dpm-panel --network dpm-test --read-only --tmpfs /tmp \
             --cap-drop ALL --security-opt no-new-privileges \
             --env-file "$RUNNER_TEMP/panel.env" -e PANEL_DB_HOST=dpm-postgres \
-            -p 127.0.0.1:3012:8080 "$IMAGE:$IMAGE_VERSION"
+            -e PANEL_ADMIN_PASSWORD -p 127.0.0.1:3012:8080 "$IMAGE:$IMAGE_VERSION"
       - name: Verify the panel in both languages
         run: |
           base=http://127.0.0.1:3012
@@ -62,10 +64,10 @@ jobs:
           grep -q 'Sign in to the panel' "$RUNNER_TEMP/login.html"
           csrf=$(sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' "$RUNNER_TEMP/login.html" | head -n 1)
           test -n "$csrf"
-          password=$(sed -n 's/^PANEL_ADMIN_PASSWORD=//p' "$RUNNER_TEMP/panel.env")
           curl --fail --silent --show-error --location --cookie "$RUNNER_TEMP/cookies" \
             --cookie-jar "$RUNNER_TEMP/cookies" --data-urlencode "csrf=$csrf" \
-            --data-urlencode "password=$password" "$base/login" > "$RUNNER_TEMP/index.html"
+            --data-urlencode username=admin --data-urlencode "password=$PANEL_ADMIN_PASSWORD" \
+            "$base/login" > "$RUNNER_TEMP/index.html"
           grep -q 'Project access' "$RUNNER_TEMP/index.html"
           grep -q 'unraid_fixture' "$RUNNER_TEMP/index.html"
           csrf=$(sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' "$RUNNER_TEMP/index.html" | head -n 1)
