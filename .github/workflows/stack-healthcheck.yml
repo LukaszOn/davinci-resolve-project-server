@@ -28,8 +28,13 @@ jobs:
         run: |
           test "$(docker compose exec -T postgres psql -U postgres -d database -Atc 'SHOW server_version_num;' | cut -c 1-2)" = "$POSTGRES_VERSION"
           curl --retry 15 --retry-delay 2 --retry-connrefused --fail --silent --show-error http://127.0.0.1:3001/misc/ping
+          docker compose exec -T postgres createdb -U postgres studio
+          docker compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d studio -c 'CREATE TABLE project_fixture (value integer); INSERT INTO project_fixture VALUES (42)'
           docker compose exec -T pgbackups /backup.sh
-          docker compose exec -T pgbackups sh -ec 'archive=$(find /backups/daily -name "*.backup" -type f | head -n 1); test -n "$archive"; pg_restore --list "$archive" >/dev/null'
+          docker compose exec -T postgres createdb -U postgres restore_check
+          docker compose exec -T pgbackups sh -ec 'PGHOST=postgres PGUSER="$POSTGRES_USER" PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --exit-on-error --single-transaction -d restore_check /backups/last/studio-latest.backup'
+          test "$(docker compose exec -T postgres psql -XAt -U postgres -d restore_check -c 'TABLE project_fixture')" = 42
+          docker compose exec -T postgres psql -XAt -U postgres -d studio -c 'SHOW davinci_manager.last_backup_utc' | grep -Eq '^[0-9]{4}-'
       - name: Print logs on failure
         if: failure()
         run: docker compose logs --tail 80

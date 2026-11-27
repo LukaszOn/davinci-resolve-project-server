@@ -6,19 +6,18 @@ Host a DaVinci Resolve project library on your own computer or NAS so multiple w
 
 | What you want to install | Start here |
 | --- | --- |
-| PostgreSQL, scheduled backups, and pgAdmin | [Download the base Compose file](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server.yml) |
-| The same stack with a web panel for managing access | [Download Compose with the web panel](https://github.com/LukaszOn/davinci-resolve-project-server/releases/latest/download/davinci-resolve-project-server-with-manager.yml) |
+| PostgreSQL, scheduled backups, and pgAdmin | [View the base Compose file](davinci-resolve-project-server.yml) |
+| The same stack with a web panel for managing access | [View the Compose file with the web panel](davinci-resolve-project-server-with-manager.yml) |
 | A stack you can build and customize locally | [Install from the repository ZIP](#first-run-from-the-repository) |
 
-[Single-file installation](#single-file-installation) · [Unraid web panel](#unraid-community-apps) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
+[Single-file installation](#single-file-installation) · [Manage access in a browser](#manage-library-access-in-a-browser) · [Unraid web panel](#unraid-community-apps) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
 
 ## Single-file installation
 
-1. Create and name a stack in your stack editor, then paste the file you chose.
-2. Set the environment variables listed below.
-3. Deploy the stack. Docker pulls the images and, if you chose the web panel, builds it from the source pinned in the Compose file.
-
-You need to install Python 3 yourself only if you [add the panel manually to the repository stack](#optional-web-panel).
+1. Open the Compose file you chose in the table above. On GitHub, use the copy button above the code to copy the whole file.
+2. Create and name a stack in your stack editor, then paste the contents.
+3. Set the environment variables listed below.
+4. Deploy the stack. Docker pulls the images and, if you chose the web panel, builds it from the source pinned in the Compose file.
 
 From a terminal, save the Compose file as `compose.yml`, put the settings in the `.env` file beside it, and run `docker compose up -d`.
 
@@ -33,13 +32,33 @@ From a terminal, save the Compose file as `compose.yml`, put the settings in the
 
 In DaVinci Resolve, choose **Network → Add Project Library → Create**, enter the Docker host address, and use the name set in `RESOLVE_LIBRARY`. Scheduled backups use that name by default. Set `BACKUP_DATABASES` to back up a different library or a list of libraries.
 
-PostgreSQL uses TCP port `5432`. By default, pgAdmin opens on port `3001` and the optional web panel on port `3012`, both at the address in `POSTGRES_BIND_IP`. For the panel, leave the username blank and enter `PANEL_ADMIN_PASSWORD`. Once you create the library in Resolve, `panel-setup` registers it and exits. The panel gets the database address from Compose and connects with its own service account.
+PostgreSQL uses TCP port `5432`. To open pgAdmin in a browser, use the address in `POSTGRES_BIND_IP` and port `3001` by default.
 
 Data and backups are stored in Docker volumes by default. To store backups in a directory on your NAS, set `BACKUP_DIR` to its absolute path. For an existing database, take a backup and restore it to the new stack.
 
+<a name="optional-web-panel"></a>
+
+### Manage library access in a browser
+
+The DaVinci Project Manager web panel runs on your Docker server. From a browser, you can create accounts, reset passwords and choose which libraries each person can access. People open their projects in DaVinci Resolve. The base Compose file is enough to host a library.
+
+1. Choose the [Compose file with the web panel](davinci-resolve-project-server-with-manager.yml) and set `PANEL_ADMIN_PASSWORD`. The panel reads its database connection settings from Compose. Python is included in the container.
+2. In Resolve, create the library named in `RESOLVE_LIBRARY`. The `panel-setup` container registers it with the panel.
+3. With the default settings, open the [local panel](http://127.0.0.1:3012) on the Docker host. If you set `POSTGRES_BIND_IP` to your NAS address, use that address in your browser, for example `http://192.168.1.50:3012`. At first sign-in, leave the username blank and enter the password you set in `PANEL_ADMIN_PASSWORD`.
+
+The panel opens in English. You can choose Polish on the sign-in page or later in the sidebar.
+
+Connect the desktop app to the same account registry to see the same accounts and library assignments. Create groups in the desktop app. The web panel shows which group grants access, even after you remove a direct assignment. [Set up user groups in the desktop app](https://github.com/LukaszOn/davinci-project-manager/blob/main/GUIDE.md#user-groups)
+
+### Connect the desktop Manager
+
+In **Connections**, enter the same host address and port `5432` you use for Resolve. Sign in with your PostgreSQL login and password. In **Connection options**, leave **Connection database** set to `postgres`. The Compose files ship without a TLS certificate. On a trusted LAN or private VPN, select **Prefer TLS** for this setup. If you configured a server certificate, use **Verify TLS** with the hostname on the certificate.
+
+Once connected, select the library you created in Resolve. [DaVinci Project Manager releases](https://github.com/LukaszOn/davinci-project-manager/releases)
+
 ## First run from the repository
 
-[Download the repository ZIP](https://github.com/LukaszOn/davinci-resolve-project-server/archive/refs/heads/main.zip) or choose **Code → Download ZIP** on GitHub. Extract the full directory on the Docker host. Compose also uses files in its subdirectories.
+Open the [repository on GitHub](https://github.com/LukaszOn/davinci-resolve-project-server), choose **Code → Download ZIP**, and extract the full directory on the Docker host. This setup also uses files in the subdirectories.
 
 | File | Purpose |
 | --- | --- |
@@ -71,6 +90,7 @@ Open `.env` in an editor. File managers may hide names beginning with a dot. On 
 | `PGADMIN_DEFAULT_EMAIL` | The email address used to sign in to pgAdmin. |
 | `PGADMIN_DEFAULT_PASSWORD` | A separate pgAdmin password. |
 | `POSTGRES_BIND_IP` | The address Resolve uses to connect to the Docker host. |
+| `RESOLVE_LIBRARY` | Enter the library name you will use in Resolve, for example `editing_projects`. The default is `studio`. Set `BACKUP_DATABASES` to override it or back up several libraries. |
 
 Keep `.env` private because it contains passwords. Use single quotes around values that contain `$`. [Compose environment file syntax](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/#env-file-syntax)
 
@@ -100,25 +120,40 @@ In Resolve's **Project Manager**, open the library list and choose **Network →
 
 | Resolve field | Value |
 | --- | --- |
-| **Name** | A new library name, for example `studio_test`. |
+| **Name** | The exact name you set in `RESOLVE_LIBRARY`. |
 | **Location** | Docker host address, for example `127.0.0.1` or your NAS address. |
 | **Username** | `POSTGRES_USER` from `.env`. The default is `postgres`. |
 | **Password** | `POSTGRES_PASSWORD` from `.env`. |
 
-Select **Create**, then create and save a test project. To open an existing library, use **Connect** and enter its exact name and credentials for an account with access. [Blackmagic Design reference manual](https://documents.blackmagicdesign.com/UserManuals/DaVinciResolveReferenceManual.pdf)
+Select **Create**, then create and save a test project. To open an existing library, use **Connect** and enter its exact name and credentials for an account with access. [Resolve documentation at Blackmagic Design Support](https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion)
 
-PostgreSQL creates the initial `database` database at startup. Resolve creates your project library in this step. Add the library name to `BACKUP_DATABASES` in `.env`. Until you set it, this stack backs up the initial database named by `POSTGRES_DB` (default `database`).
+The ZIP stack also creates an initial database called `database`. The backup schedule uses `RESOLVE_LIBRARY`. If you previously relied on `POSTGRES_DB` to choose what gets backed up, set `BACKUP_DATABASES` to that exact name before updating.
 
 ### 4. Check the first backup
 
-Check that `.env` contains the name you entered in Resolve, for example `BACKUP_DATABASES=studio_test`. Separate multiple library names with commas. Apply the setting and run a backup.
+For one library, check that `RESOLVE_LIBRARY` matches its name in Resolve. For several libraries, set a comma-separated list, for example `BACKUP_DATABASES=editing_projects,sound_projects`. Apply the settings and run a backup.
 
 ```sh
 docker compose up -d pgbackups
 docker compose exec -T pgbackups /backup.sh
 ```
 
-When you see `SQL backup created successfully`, check `backups/last/` for the library's `.backup` file. Backups run daily at **02:30 UTC** by default. They cover library data. Back up the video files and PostgreSQL roles separately.
+When you see `SQL backup created successfully`, check `backups/last/` for the library's `.backup` file. Backups run daily at **02:30 UTC** by default. To check the backup, restore it on a separate instance and open a project in Resolve. The archive contains the selected library. To recover team access as well, plan for PostgreSQL roles, the Manager account registry in `postgres` and the library access rules. Keep a separate backup of your media.
+
+## Recover a server with its accounts
+
+The scheduled archive lets you restore one library in Manager. For a self-hosted server, a physical PostgreSQL backup also preserves role passwords, groups and library registrations across the whole instance.
+
+1. From a trusted backup host, use the PostgreSQL tools for your server's major version. The backup login needs replication permission and a matching replication entry in `pg_hba.conf`. Replace the example host and login below. Choose an empty destination. The example assumes all data is under `PGDATA`.
+2. Run these commands and keep the verified copy on separate storage with restricted access.
+
+```sh
+pg_basebackup -h db.example.internal -U backup_operator -D studio-cluster -Fp -X stream -P -W
+pg_verifybackup studio-cluster
+```
+
+3. For a recovery drill, **copy** the verified directory into a fresh, empty data volume. Give the PostgreSQL operating-system user ownership and start the same PostgreSQL major version on a compatible platform, on an isolated address. Preserve the directory layout expected by `PGDATA`. Save any external PostgreSQL configuration, Compose settings, panel secrets and media separately.
+4. Open a project with an existing user account. Save a change, open a library assigned through a group and check that the server denies access to an unassigned library. Check that the original server still has the original project.
 
 ## Service addresses
 
@@ -126,20 +161,18 @@ When you see `SQL backup created successfully`, check `backups/last/` for the li
 | --- | --- | --- |
 | DaVinci Resolve | **Network** libraries on PostgreSQL port **5432**. | PostgreSQL username and password. |
 | pgAdmin | [http://127.0.0.1:3001](http://127.0.0.1:3001) on the Docker host. | `PGADMIN_DEFAULT_*` from `.env`. |
-| DaVinci Project Manager web panel | [http://127.0.0.1:3012](http://127.0.0.1:3012) after adding the panel. | At first sign-in, leave the username blank and use `PANEL_ADMIN_PASSWORD`. |
+| DaVinci Project Manager web panel | [http://127.0.0.1:3012](http://127.0.0.1:3012) after adding the panel. | Leave the username blank and enter `PANEL_ADMIN_PASSWORD`. For a single-file install, use the password from the stack settings. For a manual ZIP install, use the one in `panel/.env`. |
 
 To open pgAdmin from another computer on a trusted LAN, set `PGADMIN_BIND_IP` to the Docker host's LAN address. Run `docker compose up -d pgadmin` and open that address on port `3001`. Enter the PostgreSQL password when opening the **DaVinci Resolve** connection in pgAdmin.
 
-## Optional web panel
+## Add the panel to a server installed from the repository ZIP
 
-The web panel and the desktop app can use the same PostgreSQL account registry. Once you set up user groups in the desktop app, the web panel shows when a person's access comes from a group. Removing a direct assignment leaves any group access in place. [Set up user groups in the desktop app](https://github.com/LukaszOn/davinci-project-manager/blob/main/GUIDE.md#user-groups)
-
-English is the default. Choose **Polski** on the sign-in page or in the sidebar to switch languages.
+Use these steps if your server already runs from the repository’s `docker-compose.yml` and you want to add the panel. The single-file setup with the web panel does this automatically.
 
 <details>
-<summary>Add the panel to the repository stack</summary>
+<summary>Commands for an existing repository installation</summary>
 
-Starting with a working library from step 3, open the repository directory in a terminal with `sh`, Python 3, and access to the same Docker host. Replace `studio_test` with the exact name of the existing library.
+Starting with a working library from step 3, open the repository directory in a terminal with `sh`, Python 3, and access to the same Docker host. Replace `editing_projects` with the exact name of the existing library.
 
 ```sh
 python3 panel/configure.py init --db-host postgres --title 'DaVinci Project Manager' --output panel/.env
@@ -147,7 +180,7 @@ python3 panel/configure.py init --db-host postgres --title 'DaVinci Project Mana
 PANEL_ENV_FILE=.env \
   PANEL_POSTGRES_CONTAINER="$(docker compose ps -q postgres)" \
   PANEL_POSTGRES_ADMIN="$(docker compose exec -T postgres printenv POSTGRES_USER)" \
-  sh panel/install-db.sh studio_test
+  sh panel/install-db.sh editing_projects
 
 docker compose -f docker-compose.yml -f compose.panel.yml up -d --build
 ```
@@ -155,6 +188,13 @@ docker compose -f docker-compose.yml -f compose.panel.yml up -d --build
 The first command generates passwords in `panel/.env`. Keep this file for upgrades. To add another library, run `install-db.sh` again with its name. The installer uses `psql` in the container and sets PostgreSQL access rules for managed accounts.
 
 Open the panel on port `3012`. To change the address or port, update `PANEL_BIND_IP` or `PANEL_PORT` in the main `.env` and run the command with both Compose files again. For a panel behind an HTTPS proxy, set `PANEL_SECURE_COOKIE=1` in `panel/.env`.
+
+</details>
+
+<details>
+<summary>Testing local changes to the panel source</summary>
+
+In a full checkout, add `PANEL_BUILD_CONTEXT=./panel` and `PANEL_IMAGE=davinci-project-manager-web:local` to the settings for the single-file stack with the panel. Then run `docker compose -f davinci-resolve-project-server-with-manager.yml up -d --build` to build the image from your local source.
 
 </details>
 
@@ -167,12 +207,12 @@ If your PostgreSQL server is a local Docker container and you are setting up the
 ```sh
 PANEL_POSTGRES_CONTAINER=your-postgres \
   PANEL_ENV_FILE="$PWD/panel/.env" \
-  sh panel/install-db.sh studio_test
+  sh panel/install-db.sh editing_projects
 ```
 
 The setup saves panel credentials in `panel/.env`. If your PostgreSQL administrator login differs from `postgres`, add `PANEL_POSTGRES_ADMIN` to the command with that login.
 
-If **DaVinci Project Manager** is listed in **Apps**, select **Install**. Otherwise, save the [template XML](https://raw.githubusercontent.com/LukaszOn/davinci-resolve-project-server/main/templates/davinci-project-manager.xml) in `/boot/config/plugins/dockerMan/templates-user/` and select it under **Docker → Add Container**.
+If **DaVinci Project Manager** is listed in **Apps**, select **Install**. To install it manually, open the [Unraid XML template](templates/davinci-project-manager.xml) on GitHub. Choose **Download raw file**, save it in `/boot/config/plugins/dockerMan/templates-user/`, and select it under **Docker → Add Container**.
 
 Set **PostgreSQL host** to an address reachable from the panel container. Copy these settings from `panel/.env` or from your existing panel configuration.
 
@@ -191,7 +231,7 @@ Open **WebUI**, leave the username blank, and enter the panel administrator pass
 | `POSTGRES_VERSION` | `18`. You can use `16` or `17`. The backup container uses the same version. |
 | `POSTGRES_USER`, `POSTGRES_DB` | `postgres` and `database`. Used for the initial database setup. |
 | `POSTGRES_DATA_DIR` | `./data/postgres-<major>` on the host. PostgreSQL stores data under `<major>/docker` inside it. |
-| `BACKUP_DIR`, `BACKUP_DATABASES` | `./backups` and the list of libraries to back up. When the list is empty, the repository stack backs up `POSTGRES_DB`. |
+| `BACKUP_DIR`, `BACKUP_DATABASES` | Backup directory (default `./backups` for the ZIP stack) and optional list of databases. An empty list uses `RESOLVE_LIBRARY`. |
 | `TZ`, `BACKUP_SCHEDULE` | `UTC` and `30 2 * * *`. Set your timezone, for example `Europe/Warsaw`. |
 | `BACKUP_KEEP_DAYS`, `BACKUP_KEEP_WEEKS`, `BACKUP_KEEP_MONTHS` | Retention periods. The defaults are 7 days, 4 weeks, and 6 months. |
 | `PGADMIN_BIND_IP`, `PGADMIN_PORT` | `127.0.0.1` and `3001`. Interface and port for pgAdmin. |

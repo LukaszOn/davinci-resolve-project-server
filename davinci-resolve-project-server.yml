@@ -29,6 +29,27 @@ services:
 
   pgbackups:
     image: prodrigestivill/postgres-backup-local:${POSTGRES_VERSION:-18}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if [ ! -w /hooks ]; then
+          echo 'Backup reporting is unavailable because /hooks is read-only.' >&2
+          exec /init.sh
+        fi
+        cat > /hooks/report-library-backup <<'HOOK'
+        #!/bin/sh
+        [ "$$1" = post-backup ] || exit 0
+        PGOPTIONS='-c lock_timeout=3s -c statement_timeout=10s' psql -Xqw -1 -v ON_ERROR_STOP=1 -d postgres -v databases="$$POSTGRES_DB" <<'SQL' || echo 'Archive saved; Manager backup status could not be updated.' >&2
+        SELECT format('ALTER DATABASE %I SET davinci_manager.last_backup_utc TO %L', datname,
+                      to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+        FROM pg_catalog.pg_database
+        WHERE datname = ANY(regexp_split_to_array(:'databases', '[,[:space:]]+'))
+        \gexec
+        SQL
+        HOOK
+        chmod 755 /hooks/report-library-backup
+        exec /init.sh
     restart: unless-stopped
     depends_on:
       postgres:

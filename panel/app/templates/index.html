@@ -37,6 +37,18 @@
       {% else %}
         <p class="rail-empty">{{ tr('No connected libraries') }}</p>
       {% endfor %}
+      <form class="library-filter" action="{{ url_for('index') }}" method="get">
+        <label for="library-filter">{{ tr('Libraries') }}</label>
+        <select id="library-filter" name="biblioteka">
+          <option value="">{{ tr('Show everyone') }} ({{ total }})</option>
+          {% for library in libraries %}
+            <option value="{{ library }}"{% if library_filter == library %} selected{% endif %}>{{ library }} ({{ counts[library] }})</option>
+          {% else %}
+            <option disabled>{{ tr('No connected libraries') }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">{{ tr('Apply') }}</button>
+      </form>
     </nav>
     <div class="rail-preferences">
       {% include 'language.html' %}
@@ -89,7 +101,7 @@
                       </a>
                     </th>
                     <td><span class="member-role{% if person.account_role == 'administrator' %} is-admin{% endif %}">{{ roles[person.account_role] }}</span></td>
-                    <td><span class="library-count">{{ person.libraries|length }}</span></td>
+                    <td><span class="compact-label" aria-hidden="true">{{ tr('Libraries') }} </span><span class="library-count">{{ person.libraries|length }}</span></td>
                     <td>{% if person.enabled %}<span class="state active">{{ tr('Active') }}</span>{% else %}<span class="state muted">{{ tr('Locked') }}</span>{% endif %}</td>
                     <td><a class="arrow" href="{{ url_for('index', osoba=person.username, biblioteka=library_filter or None, q=query or None) }}#details" aria-label="{{ tr('Access for {name}', name=person.label) }}">→</a></td>
                   </tr>
@@ -118,9 +130,14 @@
             {% for library in libraries %}
               {% set has_access = library in selected.libraries %}
               {% set direct_access = library in selected.direct_libraries|default(selected.libraries) %}
+              {% set groups = (selected.groups_by_library or {}).get(library, []) %}
               <li>
-                <div class="assignment-label"><strong>{{ library }}</strong><small>{{ tr('Assigned') if direct_access else tr('Access through a group') if has_access else tr('No access') }}</small></div>
-                <form method="post" action="{{ url_for('change_person') }}" {% if direct_access %}data-confirm="{{ tr('Revoke direct access? Open connections will be closed if this account loses access to the library.') }}"{% endif %}>
+                <div class="assignment-label"><strong>{{ library }}</strong>
+                  {% if direct_access %}<small>{{ tr('Direct access') }}</small>{% endif %}
+                  {% if groups %}<small>{{ tr('Via groups: {groups}', groups=groups|join(', ')) }}</small>
+                  {% elif not direct_access %}<small>{{ tr('Access through a group') if has_access else tr('No access') }}</small>{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('change_person') }}" {% if direct_access %}data-confirm="{{ tr('Remove direct access? Access through {groups} will remain.', groups=groups|join(', ')) if groups else tr('Revoke direct access? Open connections will be closed if this account loses access to the library.') }}"{% endif %}>
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="username" value="{{ selected.username }}">
                   <input type="hidden" name="library" value="{{ library }}">
@@ -156,21 +173,23 @@
 <dialog id="add-person" aria-labelledby="add-title">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
     <header><h2 id="add-title">{{ tr('Add person') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>{{ tr('Display name') }}<input name="label" maxlength="80" required placeholder="{{ tr('e.g. Alex Smith') }}" autofocus></label>
-    <label>{{ tr('Resolve username') }}<input name="username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" aria-describedby="login-hint" required placeholder="{{ tr('e.g. alex') }}"></label>
-    <small id="login-hint">{{ tr('Start with a lowercase letter. You can add digits and underscores.') }}</small>
-    {{ role_field() }}
-    {{ password_fields('create-password') }}
-    <label>{{ tr('Profile photo (optional)') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
-    <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
-    {% if libraries %}
-      <fieldset><legend>{{ tr('Library access') }}</legend>
-        {% for library in libraries %}
-          <label class="checkbox"><input type="checkbox" name="libraries" value="{{ library }}" {% if library_filter == library %}checked{% endif %}> {{ library }}</label>
-        {% endfor %}
-      </fieldset>
-    {% endif %}
+    <div class="form-fields">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>{{ tr('Display name') }}<input name="label" maxlength="80" required placeholder="{{ tr('e.g. Alex Smith') }}" autofocus></label>
+      <label>{{ tr('Resolve username') }}<input name="username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" aria-describedby="login-hint" required placeholder="{{ tr('e.g. alex') }}"></label>
+      <small id="login-hint">{{ tr('Start with a lowercase letter. You can add digits and underscores.') }}</small>
+      {{ role_field() }}
+      {{ password_fields('create-password') }}
+      <label>{{ tr('Profile photo (optional)') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+      <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
+      {% if libraries %}
+        <fieldset><legend>{{ tr('Library access') }}</legend>
+          {% for library in libraries %}
+            <label class="checkbox"><input type="checkbox" name="libraries" value="{{ library }}" {% if library_filter == library %}checked{% endif %}> {{ library }}</label>
+          {% endfor %}
+        </fieldset>
+      {% endif %}
+    </div>
     <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="create" type="submit">{{ tr('Create account') }}</button></footer>
   </form>
 </dialog>
@@ -178,25 +197,29 @@
 <dialog id="edit-person" aria-labelledby="edit-title">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form" enctype="multipart/form-data">
     <header><h2 id="edit-title">{{ tr('Edit account') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
-    <label>{{ tr('Display name') }}<input name="label" maxlength="80" value="{{ selected.label }}" required autofocus></label>
-    <label>{{ tr('Resolve username') }}<input name="new_username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" value="{{ selected.username }}" required></label>
-    {% if selected.username == session.get('principal') %}
-      <input type="hidden" name="account_role" value="administrator">
-    {% else %}
-      {{ role_field(selected.account_role) }}
-    {% endif %}
-    <label>{{ tr('Profile photo') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
-    <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
-    {% if selected.has_avatar %}<label class="checkbox"><input type="checkbox" name="clear_photo" value="1"> {{ tr('Remove photo') }}</label>{% endif %}
+    <div class="form-fields">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+      <label>{{ tr('Display name') }}<input name="label" maxlength="80" value="{{ selected.label }}" required autofocus></label>
+      <label>{{ tr('Resolve username') }}<input name="new_username" autocomplete="off" minlength="2" maxlength="31" pattern="[a-z][a-z0-9_]{1,30}" value="{{ selected.username }}" required></label>
+      {% if selected.username == session.get('principal') %}
+        <input type="hidden" name="account_role" value="administrator">
+      {% else %}
+        {{ role_field(selected.account_role) }}
+      {% endif %}
+      <label>{{ tr('Profile photo') }}<input type="file" name="avatar" accept="image/png,image/jpeg"></label>
+      <small>{{ tr('PNG or JPEG, up to 128 KB.') }}</small>
+      {% if selected.has_avatar %}<label class="checkbox"><input type="checkbox" name="clear_photo" value="1"> {{ tr('Remove photo') }}</label>{% endif %}
+    </div>
     <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="edit" type="submit">{{ tr('Save changes') }}</button></footer>
   </form>
 </dialog>
-<dialog id="password-person" aria-labelledby="password-title">
+<dialog id="password-person" aria-labelledby="password-title" aria-describedby="password-account">
   <form method="post" action="{{ url_for('change_person') }}" class="add-form">
-    <header><h2 id="password-title">{{ tr('Change password') }}</h2><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
-    {{ password_fields('update-password') }}
+    <header><div><h2 id="password-title">{{ tr('Change password') }}</h2><p id="password-account" class="dialog-account">{{ selected.label }} · {{ selected.username }}</p></div><button class="close" type="button" data-close-dialog aria-label="{{ tr('Close') }}">×</button></header>
+    <div class="form-fields">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="username" value="{{ selected.username }}">
+      {{ password_fields('update-password') }}
+    </div>
     <footer><button type="button" class="button secondary" data-close-dialog>{{ tr('Cancel') }}</button><button class="button primary" name="action" value="password" type="submit">{{ tr('Save password') }}</button></footer>
   </form>
 </dialog>

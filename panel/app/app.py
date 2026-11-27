@@ -205,7 +205,13 @@ def read_directory():
         """).fetchone()['available']
         if groups_available:
             people = conn.execute("""
-                SELECT d.*, a.libraries AS direct_libraries
+                SELECT d.*, a.libraries AS direct_libraries,
+                       (SELECT jsonb_object_agg(grants.library, grants.groups)
+                        FROM (
+                            SELECT library, array_agg(g.label ORDER BY lower(g.label), g.group_key) AS groups
+                            FROM resolve_access.group_directory g CROSS JOIN LATERAL unnest(g.libraries) library
+                            WHERE d.username::text = ANY(g.logins) GROUP BY library
+                        ) grants) AS groups_by_library
                 FROM resolve_access.directory d JOIN resolve_access.member_direct_access a USING (username)
                 ORDER BY lower(d.label), d.username
             """).fetchall()
