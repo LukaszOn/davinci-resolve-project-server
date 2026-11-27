@@ -5,6 +5,7 @@ WORKDIR /panel
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ .
+COPY sql/registry-layout.sql sql/
 COPY start.sh .
 USER 10001:10001
 EXPOSE 8080

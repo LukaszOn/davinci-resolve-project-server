@@ -7,10 +7,10 @@ WITH rules AS (
     SELECT transport,
       MIN(r.position) FILTER (WHERE r.type = transport AND r.auth_method = 'reject'
         AND 'all' = ANY(r.database) AND '+resolve_panel_members' = ANY(r.user_name)
-        AND 'resolve_panel_agent' = ANY(r.user_name)
+        AND :'agent_user' = ANY(r.user_name)
         AND (transport = 'local' OR r.address = 'all')) AS reject_at,
       MIN(r.position) FILTER (WHERE r.auth_method = 'scram-sha-256' AND :'control_database' = ANY(r.database)
-        AND 'resolve_panel_agent' = ANY(r.user_name)) AS agent_at,
+        AND :'agent_user' = ANY(r.user_name)) AS agent_at,
       MIN(r.position) FILTER (WHERE r.auth_method = 'scram-sha-256' AND :'library' = ANY(r.database)
         AND ('+resolve_lib_' || md5(:'library')) = ANY(r.user_name)) AS library_at,
       MIN(r.position) FILTER (WHERE 'all' = ANY(r.user_name)) AS global_at

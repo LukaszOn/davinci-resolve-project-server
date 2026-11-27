@@ -3,6 +3,7 @@ import os
 import re
 import secrets
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from collections import deque
 from datetime import timedelta
@@ -11,6 +12,7 @@ from threading import Lock
 import psycopg
 from flask import Flask, Response, abort, flash, redirect, render_template, request, session, url_for
 from psycopg import errors
+from psycopg import sql
 from psycopg.rows import dict_row
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -61,24 +63,33 @@ MAX_AVATAR = 128 * 1024
 LOGIN_DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(32))
 FAILED_LOGINS = deque(maxlen=8)
 LOGIN_LOCK = Lock()
+module_directory = Path(__file__).resolve().parent
+sql_directory = module_directory / 'sql' if (module_directory / 'sql').is_dir() else module_directory.parent / 'sql'
+REGISTRY_LAYOUT = (sql_directory / 'registry-layout.sql').read_text(encoding='utf-8')
 
 
+@contextmanager
 def database():
-    return psycopg.connect(
+    with psycopg.connect(
         host=os.environ.get('PANEL_DB_HOST', 'postgres'),
         port=os.environ.get('PANEL_DB_PORT', '5432'),
         dbname=os.environ.get('PANEL_DB_NAME', 'postgres'),
-        user=os.environ.get('PANEL_DB_USER', 'resolve_panel_agent'),
+        user=os.environ.get('PANEL_DB_USER') or 'resolve_panel_agent',
         password=DB_PASSWORD, sslmode=DB_SSLMODE,
         **({'sslrootcert': DB_ROOT_CERT} if DB_ROOT_CERT else {}),
         row_factory=dict_row, connect_timeout=3, application_name='davinci_project_manager_web',
-        options='-c statement_timeout=6000 -c lock_timeout=2500',
-    )
+        options='-c search_path=pg_catalog,pg_temp -c statement_timeout=6000 -c lock_timeout=2500',
+    ) as conn:
+        layout = conn.execute(REGISTRY_LAYOUT).fetchone()['layout']
+        if not layout:
+            raise psycopg.OperationalError('The access registry could not be identified.')
+        conn.execute(sql.SQL('SET LOCAL search_path = pg_catalog, {}, pg_temp').format(sql.Identifier(f'{layout}_access')))
+        yield conn
 
 
 def panel_administrator(username):
     with database() as conn:
-        return conn.execute('SELECT * FROM resolve_access.panel_administrator(%s)', (username,)).fetchone()
+        return conn.execute('SELECT * FROM panel_administrator(%s)', (username,)).fetchone()
 
 
 @app.before_request
@@ -198,9 +209,9 @@ def logout():
 
 def read_directory():
     with database() as conn:
-        libraries = [row['name'] for row in conn.execute('SELECT name FROM resolve_access.available_libraries ORDER BY name')]
+        libraries = [row['name'] for row in conn.execute('SELECT name FROM available_libraries ORDER BY name')]
         groups_available = conn.execute("""
-            SELECT to_regclass('resolve_access.member_direct_access') IS NOT NULL AS available
+            SELECT to_regclass('member_direct_access') IS NOT NULL AS available
         """).fetchone()['available']
         if groups_available:
             people = conn.execute("""
@@ -208,14 +219,14 @@ def read_directory():
                        (SELECT jsonb_object_agg(grants.library, grants.groups)
                         FROM (
                             SELECT library, array_agg(g.label ORDER BY lower(g.label), g.group_key) AS groups
-                            FROM resolve_access.group_directory g CROSS JOIN LATERAL unnest(g.libraries) library
+                            FROM group_directory g CROSS JOIN LATERAL unnest(g.libraries) library
                             WHERE d.username::text = ANY(g.logins) GROUP BY library
                         ) grants) AS groups_by_library
-                FROM resolve_access.directory d JOIN resolve_access.member_direct_access a USING (username)
+                FROM directory d JOIN member_direct_access a USING (username)
                 ORDER BY lower(d.label), d.username
             """).fetchall()
         else:
-            people = conn.execute('SELECT * FROM resolve_access.directory ORDER BY lower(label), username').fetchall()
+            people = conn.execute('SELECT * FROM directory ORDER BY lower(label), username').fetchall()
     return libraries, people
 
 
@@ -223,7 +234,7 @@ def read_directory():
 def healthz():
     try:
         with database() as conn:
-            conn.execute('SELECT name FROM resolve_access.available_libraries LIMIT 1').fetchone()
+            conn.execute('SELECT name FROM available_libraries LIMIT 1').fetchone()
     except psycopg.Error:
         return 'unavailable\n', 503
     return 'ok\n'
@@ -256,7 +267,7 @@ def index():
 
 
 def apply(conn, action, username, label=None, verifier=None, library=None):
-    conn.execute('SELECT resolve_access.apply_change(%s, %s, %s, %s, %s)', (action, username, label, verifier, library))
+    conn.execute('SELECT apply_change(%s, %s, %s, %s, %s)', (action, username, label, verifier, library))
 
 
 def avatar_type(content):
@@ -272,7 +283,7 @@ def member_avatar(username):
     if not LOGIN_NAME.fullmatch(username):
         abort(404)
     with database() as conn:
-        avatar = conn.execute('SELECT resolve_access.member_avatar(%s) AS photo', (username,)).fetchone()['photo']
+        avatar = conn.execute('SELECT member_avatar(%s) AS photo', (username,)).fetchone()['photo']
     mimetype = avatar_type(avatar) if avatar else None
     if not mimetype:
         abort(404)
@@ -327,7 +338,7 @@ def change_person():
         with database() as conn:
             verifier = conn.pgconn.encrypt_password(password.encode(), username.encode(), b'scram-sha-256').decode() if password else None
             if action in ('create', 'edit', 'password', 'delete'):
-                conn.execute('SELECT resolve_access.change_member(%s,%s,%s,%s,%s,%s,%s,%s,%s)', (
+                conn.execute('SELECT change_member(%s,%s,%s,%s,%s,%s,%s,%s,%s)', (
                     action, username, new_login if action == 'edit' else username, label, role, verifier,
                     web_hash, photo, request.form.get('clear_photo') == '1' and photo is None,
                 ))
@@ -335,7 +346,7 @@ def change_person():
                 apply(conn, action, username, library=library)
             if action == 'revoke' and conn.execute("""
                 SELECT EXISTS (
-                    SELECT FROM resolve_access.directory WHERE username = %s AND %s = ANY(libraries)
+                    SELECT FROM directory WHERE username = %s AND %s = ANY(libraries)
                 ) AS still_assigned
             """, (username, library)).fetchone()['still_assigned']:
                 messages['revoke'] = 'Direct access revoked. Group access is still active.'
@@ -354,7 +365,7 @@ def change_person():
     if action in ('revoke', 'disable'):
         try:
             with database() as conn:
-                conn.execute('SELECT resolve_access.close_revoked_sessions(%s)', (username,))
+                conn.execute('SELECT close_revoked_sessions(%s)', (username,))
         except psycopg.Error as error:
             app.logger.warning('Could not close sessions. SQLSTATE=%s', error.sqlstate)
             flash('Access changed. Repeat the operation if you still need to close open connections.', 'error')

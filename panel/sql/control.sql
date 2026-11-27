@@ -27,12 +27,74 @@ ALTER TABLE resolve_access.people
 
 SELECT 'CREATE ROLE resolve_panel_members NOLOGIN'
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'resolve_panel_members') \gexec
-SELECT 'CREATE ROLE resolve_panel_agent LOGIN'
-WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'resolve_panel_agent') \gexec
-\if :{?agent_password}
-ALTER ROLE resolve_panel_agent LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS
-    PASSWORD :'agent_password';
+CREATE TABLE IF NOT EXISTS resolve_access.panel_service_account (
+    singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+    username name NOT NULL UNIQUE
+);
+\if :{?agent_user}
+\else
+\set agent_user resolve_panel_agent
 \endif
+\if :{?verified_user}
+\else
+\set verified_user ''
+\endif
+SELECT set_config('davinci_manager.install_agent', :'agent_user', true),
+       set_config('davinci_manager.verified_agent', :'verified_user', true);
+DO $account$
+DECLARE
+    requested text := current_setting('davinci_manager.install_agent');
+    installed name;
+    candidate pg_authid%ROWTYPE;
+    legacy_oid oid;
+BEGIN
+    SELECT username INTO installed FROM resolve_access.panel_service_account;
+    IF installed IS NULL THEN
+        legacy_oid := (SELECT r.oid
+            FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
+            JOIN pg_roles r ON r.oid = a.grantee
+            WHERE p.oid = to_regprocedure('resolve_access.panel_administrator(text)')
+              AND r.oid <> p.proowner AND a.privilege_type = 'EXECUTE');
+        SELECT rolname INTO installed FROM pg_authid WHERE oid = legacy_oid AND rolpassword IS NOT NULL;
+    END IF;
+    IF installed IS DISTINCT FROM NULLIF(current_setting('davinci_manager.verified_agent'), '') THEN
+        RAISE EXCEPTION 'The installed panel login changed. Retry with its existing credentials.';
+    END IF;
+    SELECT * INTO candidate FROM pg_authid WHERE rolname = COALESCE(installed, requested);
+    IF (installed IS NOT NULL AND NOT FOUND) OR (FOUND AND (
+        candidate.rolsuper OR candidate.rolcreatedb OR candidate.rolcreaterole OR candidate.rolreplication
+        OR candidate.rolbypassrls OR NOT candidate.rolcanlogin
+        OR NOT EXISTS (
+            SELECT FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
+            WHERE p.oid = to_regprocedure('resolve_access.panel_administrator(text)')
+              AND a.grantee = candidate.oid AND a.privilege_type = 'EXECUTE'
+        )
+        OR (installed IS NULL AND candidate.oid IS DISTINCT FROM legacy_oid)
+    )) THEN
+        RAISE EXCEPTION 'The existing role "%" does not belong to this panel installation.', COALESCE(installed, requested);
+    END IF;
+    IF installed IS NOT NULL AND installed <> requested THEN
+        IF EXISTS (SELECT FROM pg_roles WHERE rolname = requested) THEN
+            RAISE EXCEPTION 'Role "%" already exists. Choose another PANEL_DB_USER.', requested;
+        END IF;
+        IF candidate.rolpassword IS NULL OR candidate.rolpassword NOT LIKE 'SCRAM-SHA-256$%' THEN
+            RAISE EXCEPTION 'The installed service account needs a SCRAM password before it can be renamed.';
+        END IF;
+        EXECUTE format('ALTER ROLE %I RENAME TO %I', installed, requested);
+    END IF;
+END;
+$account$;
+SELECT NOT EXISTS (SELECT FROM pg_authid WHERE rolname = :'agent_user' AND rolpassword IS NOT NULL)
+    AS needs_password \gset
+SELECT format('CREATE ROLE %I LOGIN', :'agent_user')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'agent_user') \gexec
+\if :{?agent_password}
+\if :needs_password
+ALTER ROLE :"agent_user" PASSWORD :'agent_password';
+\endif
+\endif
+INSERT INTO resolve_access.panel_service_account(username) VALUES (:'agent_user')
+ON CONFLICT (singleton) DO UPDATE SET username = excluded.username;
 
 CREATE OR REPLACE VIEW resolve_access.available_libraries AS
 SELECT l.name, l.access_role
@@ -246,10 +308,17 @@ END;
 $body$;
 
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA resolve_access FROM PUBLIC;
-SELECT format('GRANT CONNECT ON DATABASE %I TO resolve_panel_agent', current_database()) \gexec
-GRANT USAGE ON SCHEMA resolve_access TO resolve_panel_agent;
-GRANT SELECT ON resolve_access.directory, resolve_access.available_libraries TO resolve_panel_agent;
+SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'agent_user') \gexec
+GRANT USAGE ON SCHEMA resolve_access TO :"agent_user";
+GRANT SELECT ON resolve_access.directory, resolve_access.available_libraries TO :"agent_user";
 GRANT EXECUTE ON FUNCTION resolve_access.apply_change(text,text,text,text,text),
     resolve_access.close_revoked_sessions(text), resolve_access.panel_administrator(text), resolve_access.member_avatar(text),
-    resolve_access.change_member(text,text,text,text,text,text,text,bytea,boolean) TO resolve_panel_agent;
+    resolve_access.change_member(text,text,text,text,text,text,text,bytea,boolean) TO :"agent_user";
+SELECT to_regclass('resolve_access.group_directory') IS NOT NULL AND
+       to_regclass('resolve_access.member_direct_access') IS NOT NULL AND
+       to_regprocedure('resolve_access.change_group(text,bigint,text,text[],text[])') IS NOT NULL AS has_groups \gset
+\if :has_groups
+GRANT SELECT ON resolve_access.group_directory, resolve_access.member_direct_access TO :"agent_user";
+GRANT EXECUTE ON FUNCTION resolve_access.change_group(text,bigint,text,text[],text[]) TO :"agent_user";
+\endif
 COMMIT;
